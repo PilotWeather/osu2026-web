@@ -10,7 +10,9 @@
     "start": "next start",
     "lint": "eslint",
     "prisma:generate": "prisma generate",
-    "prisma:push": "prisma db push",
+    "prisma:migrate:dev": "prisma migrate dev",
+    "prisma:migrate:deploy": "prisma migrate deploy",
+    "prisma:migrate:status": "prisma migrate status",
     "import:personnel": "node --no-warnings scripts/import-personnel-from-pdf.ts"
   },
   "dependencies": {

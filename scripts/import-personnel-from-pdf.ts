@@ -161,16 +161,13 @@ async function importDatabase(rows: ParsedPersonnel[]): Promise<void> {
     for (const row of rows) {
       await prisma.$transaction(async (tx) => {
         const sourceKey = `osu2026:${row.sourceSequence}`;
-        const [company, team, byNationalId, byLicense, bySource] = await Promise.all([
+        const [company, team, byNationalId, bySource] = await Promise.all([
           tx.company.upsert({ where: { name: row.company }, update: {}, create: { name: row.company } }),
           tx.team.upsert({ where: { name: row.team }, update: {}, create: { name: row.team } }),
           tx.personnel.findUnique({ where: { nationalId: row.nationalId }, select: { id: true } }),
-          row.licenseNo
-            ? tx.personnel.findUnique({ where: { licenseNo: row.licenseNo }, select: { id: true } })
-            : null,
           tx.personnel.findUnique({ where: { sourceKey }, select: { id: true } }),
         ]);
-        const matchingIds = new Set([byNationalId?.id, byLicense?.id, bySource?.id].filter(Boolean));
+        const matchingIds = new Set([byNationalId?.id, bySource?.id].filter(Boolean));
         if (matchingIds.size > 1) {
           throw new Error(`Ambiguous identity match for source sequence ${row.sourceSequence}; import stopped safely.`);
         }
@@ -245,11 +242,12 @@ async function importDatabase(rows: ParsedPersonnel[]): Promise<void> {
 
 async function main() {
   const pdfPath = path.resolve("data/OSU2026-PERSONEL.pdf");
-  const snapshotPath = path.resolve("data/parsed-personnel.json");
+  if (!process.env.DATABASE_URL) {
+    throw new Error("DATABASE_URL is required to import personnel into PostgreSQL.");
+  }
   if (!fs.existsSync(pdfPath)) throw new Error(`PDF not found: ${pdfPath}`);
 
   const report = await extractAndParse(pdfPath);
-  fs.writeFileSync(snapshotPath, `${JSON.stringify(report.validPersonnel, null, 2)}\n`, { mode: 0o600 });
 
   console.log(`PDF pages: ${report.pages}`);
   console.log(`Raw non-empty text lines: ${report.rawNonEmptyLines}`);
@@ -269,12 +267,8 @@ async function main() {
     phone: mask(row.phone),
   })), null, 2));
 
-  if (process.env.DATABASE_URL) {
-    await importDatabase(report.validPersonnel);
-    console.log(`Database imported: ${report.validPersonnel.length}`);
-  } else {
-    console.log("Database imported: no (DATABASE_URL is not configured)");
-  }
+  await importDatabase(report.validPersonnel);
+  console.log(`Database imported: ${report.validPersonnel.length}`);
 }
 
 main().catch((error: unknown) => {

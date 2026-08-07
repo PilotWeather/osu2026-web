@@ -1,24 +1,5 @@
-import fs from "node:fs/promises";
-import path from "node:path";
 import { prisma } from "@/src/lib/db";
 import type { Personnel, PersonnelCredentialType } from "@/src/types/personnel";
-
-interface SnapshotPersonnel {
-  sourceSequence: number;
-  nationalId: string;
-  firstName: string;
-  lastName: string;
-  phone: string | null;
-  team: string;
-  company: string;
-  email: string | null;
-  birthDate: string | null;
-  tshirtSize: string | null;
-  vehiclePlate: string | null;
-  notes: string | null;
-  licenseNo: string | null;
-  credentials: Array<{ type: PersonnelCredentialType; expiryDate: string | null }>;
-}
 
 function maskPhone(phone: string | null): string | null {
   if (!phone) return null;
@@ -33,44 +14,16 @@ function maskPhone(phone: string | null): string | null {
   }).reverse().join("");
 }
 
-function snapshotToPublic(row: SnapshotPersonnel): Personnel {
-  const timestamp = new Date(0).toISOString();
-  return {
-    id: `source-${row.sourceSequence}`,
-    sourceSequence: row.sourceSequence,
-    firstName: row.firstName,
-    lastName: row.lastName,
-    phone: maskPhone(row.phone),
-    email: row.email,
-    birthDate: row.birthDate,
-    tshirtSize: row.tshirtSize,
-    licenseNo: row.licenseNo,
-    notes: row.notes,
-    company: row.company,
-    team: row.team,
-    vehiclePlate: row.vehiclePlate,
-    credentials: row.credentials.map((credential) => ({
-      id: `${credential.type.toLowerCase()}-${row.sourceSequence}`,
-      type: credential.type,
-      expiryDate: credential.expiryDate,
-    })),
-    createdAt: timestamp,
-    updatedAt: timestamp,
-  };
-}
-
-async function readSnapshot(): Promise<Personnel[]> {
-  const snapshotPath = path.join(process.cwd(), "data", "parsed-personnel.json");
-  try {
-    const raw = await fs.readFile(snapshotPath, "utf8");
-    return (JSON.parse(raw) as SnapshotPersonnel[]).map(snapshotToPublic);
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") return [];
-    throw error;
+function requireDatabaseUrl(): void {
+  if (!process.env.DATABASE_URL) {
+    throw new Error(
+      "OSU2026 cannot start without PostgreSQL. Configure DATABASE_URL in the server environment.",
+    );
   }
 }
 
-async function readDatabase(): Promise<Personnel[]> {
+export async function getPersonnelList(): Promise<Personnel[]> {
+  requireDatabaseUrl();
   const rows = await prisma.personnel.findMany({
     orderBy: [{ sourceSequence: "asc" }, { lastName: "asc" }],
     select: {
@@ -105,16 +58,6 @@ async function readDatabase(): Promise<Personnel[]> {
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   }));
-}
-
-export async function getPersonnelList(): Promise<Personnel[]> {
-  if (process.env.DATABASE_URL) return readDatabase();
-  if (process.env.NODE_ENV !== "production" && process.env.USE_PERSONNEL_SNAPSHOT === "true") {
-    return readSnapshot();
-  }
-  throw new Error(
-    "DATABASE_URL is required. For an explicit local-only fallback, set USE_PERSONNEL_SNAPSHOT=true.",
-  );
 }
 
 export async function getPersonnelById(id: string): Promise<Personnel | null> {

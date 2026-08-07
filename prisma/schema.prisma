@@ -34,7 +34,7 @@ model Personnel {
   email          String?
   birthDate      DateTime?
   tshirtSize     String?
-  licenseNo      String?      @unique
+  licenseNo      String?
   notes          String?
   companyId      String?
   teamId         String?
@@ -47,6 +47,7 @@ model Personnel {
 
   @@index([companyId])
   @@index([teamId])
+  @@index([licenseNo])
 }
 
 model Vehicle {
