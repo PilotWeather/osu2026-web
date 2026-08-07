@@ -6,16 +6,16 @@ const publicPaths = ["/login", "/api/auth"];
 export default auth((request) => {
   const { pathname, search } = request.nextUrl;
   const isPublic = publicPaths.some((path) => pathname === path || pathname.startsWith(`${path}/`));
-  const isAuthorized = request.auth?.user?.active === true;
+  const isAuthenticated = Boolean(request.auth?.user?.id && request.auth.user.email);
 
-  if (pathname === "/login" && isAuthorized) {
+  if (pathname === "/login" && isAuthenticated) {
     return NextResponse.redirect(new URL("/", request.url));
   }
   if (isPublic) return NextResponse.next();
-  if (!isAuthorized && pathname.startsWith("/api/")) {
+  if (!isAuthenticated && pathname.startsWith("/api/")) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
-  if (!isAuthorized) {
+  if (!isAuthenticated) {
     const loginUrl = new URL("/login", request.url);
     loginUrl.searchParams.set("callbackUrl", `${pathname}${search}`);
     return NextResponse.redirect(loginUrl);

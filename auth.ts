@@ -1,6 +1,7 @@
 import NextAuth from "next-auth";
 import Google from "next-auth/providers/google";
 import { PrismaAdapter } from "@auth/prisma-adapter";
+import { UserRole } from "@prisma/client";
 import { prisma } from "@/src/lib/db";
 
 // Auth.js v5 names take precedence. The explicit legacy mapping keeps existing
@@ -10,7 +11,7 @@ const googleClientSecret = process.env.AUTH_GOOGLE_SECRET ?? process.env.GOOGLE_
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: PrismaAdapter(prisma),
-  session: { strategy: "database" },
+  session: { strategy: "jwt" },
   providers: [
     Google({
       clientId: googleClientId,
@@ -33,16 +34,27 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       });
       return authorizedUser?.active === true;
     },
-    async session({ session }) {
-      const email = session.user.email?.trim().toLocaleLowerCase("en-US");
-      const authorizedUser = email
-        ? await prisma.authorizedUser.findUnique({
-            where: { email },
-            select: { role: true, active: true },
-          })
-        : null;
-      session.user.role = authorizedUser?.role ?? "VIEWER";
-      session.user.active = authorizedUser?.active === true;
+    async jwt({ token, user }) {
+      if (!user) return token;
+      const email = user.email?.trim().toLocaleLowerCase("en-US");
+      if (!email) return token;
+      const authorizedUser = await prisma.authorizedUser.findUnique({
+        where: { email },
+        select: { role: true, active: true },
+      });
+      if (!authorizedUser?.active) return token;
+      token.userId = user.id;
+      token.email = email;
+      token.role = authorizedUser.role;
+      return token;
+    },
+    async session({ session, token }) {
+      const userId = typeof token.userId === "string" ? token.userId : "";
+      const role = Object.values(UserRole).find((candidate) => candidate === token.role);
+      session.user.id = userId;
+      session.user.email = token.email ?? session.user.email;
+      session.user.role = role ?? UserRole.VIEWER;
+      session.user.active = Boolean(userId && token.email && role);
       return session;
     },
   },

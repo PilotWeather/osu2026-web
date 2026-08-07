@@ -21,7 +21,7 @@ function GoogleIcon() {
 export default async function LoginPage({ searchParams }: LoginPageProps) {
   await connection();
   const [session, params] = await Promise.all([auth(), searchParams]);
-  if (session?.user?.active) redirect("/");
+  if (session?.user?.id) redirect("/");
   const accessDenied = params.error === "AccessDenied";
 
   return (
