@@ -3,12 +3,12 @@ import { PrismaClient, UserRole } from "@prisma/client";
 const prisma = new PrismaClient();
 
 async function main() {
-  const email = process.env.FIRST_ADMIN_EMAIL?.trim().toLocaleLowerCase("en-US");
+  const email = process.env.INITIAL_ADMIN_EMAIL?.trim().toLocaleLowerCase("en-US");
   if (!email || !email.includes("@")) {
-    throw new Error("FIRST_ADMIN_EMAIL must contain the pre-approved Google account email.");
+    throw new Error("INITIAL_ADMIN_EMAIL must contain the pre-approved Google account email.");
   }
 
-  const configuredName = process.env.FIRST_ADMIN_NAME?.trim();
+  const configuredName = process.env.INITIAL_ADMIN_NAME?.trim();
   await prisma.authorizedUser.upsert({
     where: { email },
     update: {

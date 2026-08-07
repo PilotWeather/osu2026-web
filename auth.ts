@@ -8,8 +8,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   session: { strategy: "database" },
   providers: [
     Google({
-      clientId: process.env.GOOGLE_CLIENT_ID,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+      authorization: { params: { prompt: "select_account" } },
     }),
   ],
   pages: {
@@ -18,6 +17,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   },
   callbacks: {
     async signIn({ user, profile }) {
+      // This callback runs only after Google has returned an authenticated identity.
       const email = (user.email ?? profile?.email)?.trim().toLocaleLowerCase("en-US");
       if (!email) return false;
       const authorizedUser = await prisma.authorizedUser.findUnique({

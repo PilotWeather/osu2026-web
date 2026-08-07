@@ -22,6 +22,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   await connection();
   const [session, params] = await Promise.all([auth(), searchParams]);
   if (session?.user?.active) redirect("/");
+  const accessDenied = params.error === "AccessDenied";
 
   return (
     <main className="relative flex min-h-screen items-center justify-center bg-[linear-gradient(180deg,#f8fafc_0%,#eef2f7_100%)] px-4 text-slate-900 dark:bg-[linear-gradient(180deg,#0b0f19_0%,#0d1320_100%)] dark:text-slate-100">
@@ -33,7 +34,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
           Internal Operations System
         </p>
 
-        {params.error ? (
+        {accessDenied ? (
           <div role="alert" className="mt-6 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300">
             You are not authorized to access this system.
           </div>
