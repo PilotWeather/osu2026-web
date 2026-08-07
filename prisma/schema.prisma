@@ -36,6 +36,7 @@ model Personnel {
   tshirtSize     String?
   licenseNo      String?
   notes          String?
+  isActiveFlying Boolean      @default(false)
   companyId      String?
   teamId         String?
   createdAt      DateTime     @default(now())
@@ -48,6 +49,7 @@ model Personnel {
   @@index([companyId])
   @@index([teamId])
   @@index([licenseNo])
+  @@index([isActiveFlying])
 }
 
 model Vehicle {

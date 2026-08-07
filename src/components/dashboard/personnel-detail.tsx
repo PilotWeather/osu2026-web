@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { formatDate } from "@/src/lib/expiry";
 import type { Personnel } from "@/src/types/personnel";
+import { FlyingStatusBadge } from "@/src/components/dashboard/flying-status-badge";
 
 interface PersonnelDetailProps {
   person: Personnel | null;
@@ -39,6 +40,7 @@ export function PersonnelDetail({ person, onClose }: PersonnelDetailProps) {
           <div>
             <p className="text-sm font-semibold uppercase tracking-[0.2em] text-blue-600 dark:text-blue-400">Personel Detayı</p>
             <h2 id="personnel-detail-title" className="mt-1 text-2xl font-semibold text-slate-900 dark:text-slate-100">{person.firstName} {person.lastName}</h2>
+            <div className="mt-3"><FlyingStatusBadge isActive={person.isActiveFlying} detailed /></div>
           </div>
           <button type="button" onClick={onClose} className="rounded-full border border-slate-200 bg-white px-3 py-1 text-sm font-medium text-slate-600 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:border-blue-500/60 dark:hover:bg-blue-500/10 dark:hover:text-blue-400 dark:focus-visible:ring-blue-400">Kapat</button>
         </div>

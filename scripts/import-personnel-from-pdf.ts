@@ -23,6 +23,7 @@ export interface ParsedPersonnel {
   tshirtSize: string | null;
   vehiclePlate: string | null;
   notes: string | null;
+  isActiveFlying: boolean;
   licenseNo: string | null;
   credentials: ParsedCredential[];
 }
@@ -91,6 +92,7 @@ function parseCandidate(line: string): { personnel?: ParsedPersonnel; ambiguity?
   const email = beforeLicense.find((cell) => cell.includes("@") || /^[\w.-]+\.[\w.-]+$/i.test(cell)) ?? null;
   const tshirtSize = beforeLicense.find((cell) => TSHIRT_PATTERN.test(cell))?.toUpperCase() ?? null;
   const plates = beforeLicense.filter((cell) => PLATE_PATTERN.test(cell));
+  const isActiveFlying = beforeLicense.includes("1");
   const ignored = new Set([email, tshirtSize, ...datesBeforeLicense, ...plates, "1", null]);
   const unclassified = beforeLicense.filter((cell) => !ignored.has(cell));
   const notes = unclassified.filter((cell) => cell !== "CCCCCCC").join(" ") || null;
@@ -113,6 +115,7 @@ function parseCandidate(line: string): { personnel?: ParsedPersonnel; ambiguity?
       tshirtSize,
       vehiclePlate: plates.join(" - ") || null,
       notes,
+      isActiveFlying,
       licenseNo,
       credentials: credentialTypes.map((type, index) => ({ type, expiryDate: expiryDates[index] ?? null })),
     },
@@ -183,6 +186,7 @@ async function importDatabase(rows: ParsedPersonnel[]): Promise<void> {
           tshirtSize: row.tshirtSize,
           licenseNo: row.licenseNo,
           notes: row.notes,
+          isActiveFlying: row.isActiveFlying,
           companyId: company.id,
           teamId: team.id,
         };
@@ -224,8 +228,10 @@ async function importDatabase(rows: ParsedPersonnel[]): Promise<void> {
       });
     }
 
-    const [personnel, teams, companies, vehicles, sep, sepFi, class1] = await Promise.all([
+    const [personnel, activeFlying, inactive, teams, companies, vehicles, sep, sepFi, class1] = await Promise.all([
       prisma.personnel.count(),
+      prisma.personnel.count({ where: { isActiveFlying: true } }),
+      prisma.personnel.count({ where: { isActiveFlying: false } }),
       prisma.team.count(),
       prisma.company.count(),
       prisma.vehicle.count({ where: { active: true } }),
@@ -234,7 +240,7 @@ async function importDatabase(rows: ParsedPersonnel[]): Promise<void> {
       prisma.credential.count({ where: { type: PrismaCredentialType.CLASS_1, expiryDate: { not: null } } }),
     ]);
     console.log("Database counts:");
-    console.log(JSON.stringify({ personnel, teams, companies, vehicles, SEP: sep, SEP_FI: sepFi, CLASS_1: class1 }, null, 2));
+    console.log(JSON.stringify({ personnel, activeFlying, inactive, teams, companies, vehicles, SEP: sep, SEP_FI: sepFi, CLASS_1: class1 }, null, 2));
   } finally {
     await prisma.$disconnect();
   }

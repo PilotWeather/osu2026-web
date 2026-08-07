@@ -17,6 +17,7 @@ export interface Personnel {
   tshirtSize: string | null;
   licenseNo: string | null;
   notes: string | null;
+  isActiveFlying: boolean;
   company: string | null;
   team: string | null;
   vehiclePlate: string | null;

@@ -19,10 +19,9 @@ function SummaryCard({ title, value, hint }: SummaryCardProps) {
 
 export async function SummaryCards() {
   const personnel = await getPersonnelList();
-  const teamCounts = personnel.reduce<Record<string, number>>((acc, person) => {
-    acc[person.team ?? "-"] = (acc[person.team ?? "-"] ?? 0) + 1;
-    return acc;
-  }, {});
+  const activeFlying = personnel.filter((person) => person.isActiveFlying).length;
+  const companies = new Set(personnel.map((person) => person.company).filter(Boolean)).size;
+  const teams = new Set(personnel.map((person) => person.team).filter(Boolean)).size;
 
   const upcomingCredentials = personnel.filter((person) =>
     person.credentials.some((credential) => {
@@ -33,11 +32,11 @@ export async function SummaryCards() {
 
   return (
     <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
-      <SummaryCard title="Toplam Öğretmen" value={personnel.length.toString()} hint="Aktif kayıtlı personel" />
-      <SummaryCard title="Team 1" value={(teamCounts["Team 1"] ?? 0).toString()} hint="Ekip dağılımı" />
-      <SummaryCard title="Team 2" value={(teamCounts["Team 2"] ?? 0).toString()} hint="Ekip dağılımı" />
-      <SummaryCard title="Team 3" value={(teamCounts["Team 3"] ?? 0).toString()} hint="Ekip dağılımı" />
-      <SummaryCard title="Team 4" value={(teamCounts["Team 4"] ?? 0).toString()} hint="Ekip dağılımı" />
+      <SummaryCard title="Toplam Personel" value={personnel.length.toString()} hint="Kayıtlı öğretmenler" />
+      <SummaryCard title="🟢 Active Flying" value={activeFlying.toString()} hint="Aktif uçuş personeli" />
+      <SummaryCard title="⚪ Inactive" value={(personnel.length - activeFlying).toString()} hint="Aktif uçuşta değil" />
+      <SummaryCard title="Şirketler" value={companies.toString()} hint="Toplam şirket" />
+      <SummaryCard title="Ekipler" value={teams.toString()} hint="Toplam ekip" />
       <SummaryCard title="Yaklaşan Lisans Süreleri" value={upcomingCredentials.length.toString()} hint="90 güne kadar" />
     </div>
   );

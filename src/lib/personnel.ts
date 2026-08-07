@@ -29,6 +29,7 @@ export async function getPersonnelList(): Promise<Personnel[]> {
     select: {
       id: true, sourceSequence: true, firstName: true, lastName: true, phone: true,
       email: true, birthDate: true, tshirtSize: true, licenseNo: true, notes: true,
+      isActiveFlying: true,
       createdAt: true, updatedAt: true,
       company: { select: { name: true } },
       team: { select: { name: true } },
@@ -47,6 +48,7 @@ export async function getPersonnelList(): Promise<Personnel[]> {
     tshirtSize: row.tshirtSize,
     licenseNo: row.licenseNo,
     notes: row.notes,
+    isActiveFlying: row.isActiveFlying,
     company: row.company?.name ?? null,
     team: row.team?.name ?? null,
     vehiclePlate: row.vehicles.map((vehicle) => vehicle.plate).join(" - ") || null,
