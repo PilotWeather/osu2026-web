@@ -1,8 +1,17 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
   --background: #f8fafc;
   --foreground: #0f172a;
+  color-scheme: light;
+}
+
+.dark {
+  --background: #0b0f19;
+  --foreground: #f1f5f9;
+  color-scheme: dark;
 }
 
 @theme inline {
@@ -23,7 +32,53 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
+body,
+main,
+header,
+section,
+div,
+table,
+thead,
+tbody,
+tr,
+th,
+td,
+input,
+select,
+button,
+span,
+p,
+h1,
+h2 {
+  transition-property: color, background-color, border-color, box-shadow, fill, stroke;
+  transition-duration: 220ms;
+  transition-timing-function: ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+}
+
+.dark :focus-visible {
+  outline-color: #60a5fa;
+}
+
 ::selection {
   background: #bae6fd;
   color: #0f172a;
+}
+
+.dark ::selection {
+  background: #1d4ed8;
+  color: #f8fafc;
 }

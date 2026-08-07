@@ -9,10 +9,10 @@ interface SummaryCardProps {
 
 function SummaryCard({ title, value, hint }: SummaryCardProps) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-      <p className="text-sm font-medium text-slate-500">{title}</p>
-      <p className="mt-2 text-2xl font-semibold text-slate-900">{value}</p>
-      <p className="mt-1 text-xs text-slate-500">{hint}</p>
+    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition-colors duration-200 hover:border-blue-200 hover:bg-blue-50/30 hover:shadow-md dark:border-slate-800 dark:bg-slate-900 dark:shadow-black/20 dark:hover:border-blue-500/30 dark:hover:bg-blue-500/5">
+      <p className="text-sm font-medium text-slate-500 dark:text-slate-400">{title}</p>
+      <p className="mt-2 text-2xl font-semibold text-slate-900 dark:text-slate-100">{value}</p>
+      <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{hint}</p>
     </div>
   );
 }
