@@ -42,3 +42,7 @@ next-env.d.ts
 
 # prisma
 /prisma/migrations
+
+# local source files
+/data/*.pdf
+/data/parsed-personnel.json

@@ -1,8 +1,10 @@
 import { SummaryCards } from "@/src/components/dashboard/summary-cards";
 import { PersonnelTable } from "@/src/components/dashboard/personnel-table";
 import { getPersonnelList } from "@/src/lib/personnel";
+import { connection } from "next/server";
 
 export default async function HomePage() {
+  await connection();
   const personnel = await getPersonnelList();
 
   return (

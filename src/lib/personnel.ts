@@ -1,158 +1,122 @@
+import fs from "node:fs/promises";
+import path from "node:path";
+import { prisma } from "@/src/lib/db";
 import type { Personnel, PersonnelCredentialType } from "@/src/types/personnel";
 
-const sampleCredentials: Record<string, Array<{ id: string; type: PersonnelCredentialType; expiryDate: string | null }>> = {
-  "1": [
-    { id: "sep-1", type: "SEP", expiryDate: "2026-10-14" },
-    { id: "sep-fi-1", type: "SEP_FI", expiryDate: "2026-08-21" },
-    { id: "class-1-1", type: "CLASS_1", expiryDate: "2027-02-10" },
-  ],
-  "2": [
-    { id: "sep-2", type: "SEP", expiryDate: "2026-09-03" },
-    { id: "sep-fi-2", type: "SEP_FI", expiryDate: "2026-11-18" },
-    { id: "class-1-2", type: "CLASS_1", expiryDate: "2026-12-04" },
-  ],
-  "3": [
-    { id: "sep-3", type: "SEP", expiryDate: "2026-08-17" },
-    { id: "sep-fi-3", type: "SEP_FI", expiryDate: "2026-10-01" },
-    { id: "class-1-3", type: "CLASS_1", expiryDate: "2027-01-20" },
-  ],
-  "4": [
-    { id: "sep-4", type: "SEP", expiryDate: "2027-01-30" },
-    { id: "sep-fi-4", type: "SEP_FI", expiryDate: "2026-09-12" },
-    { id: "class-1-4", type: "CLASS_1", expiryDate: null },
-  ],
-  "5": [
-    { id: "sep-5", type: "SEP", expiryDate: null },
-    { id: "sep-fi-5", type: "SEP_FI", expiryDate: "2026-10-09" },
-    { id: "class-1-5", type: "CLASS_1", expiryDate: "2027-05-18" },
-  ],
-};
-
-const samplePersonnel: Personnel[] = [
-  {
-    id: "1",
-    sourceSequence: 1,
-    nationalId: "12345678901",
-    firstName: "Ahmet",
-    lastName: "Yılmaz",
-    phone: "+905551234567",
-    email: "ahmet.yilmaz@pilotweather.pro",
-    birthDate: "1988-04-11",
-    tshirtSize: "L",
-    licenseNo: "LIC-1042",
-    notes: "Team 1 ana eğitmen",
-    company: "OMAŞ",
-    team: "Team 1",
-    vehiclePlate: "34 ABC 123",
-    credentials: sampleCredentials["1"],
-    createdAt: "2026-08-01T10:00:00.000Z",
-    updatedAt: "2026-08-01T10:00:00.000Z",
-  },
-  {
-    id: "2",
-    sourceSequence: 2,
-    nationalId: "22345678901",
-    firstName: "Cem",
-    lastName: "Kara",
-    phone: "+905552345678",
-    email: "cem.kara@pilotweather.pro",
-    birthDate: "1990-06-07",
-    tshirtSize: "XL",
-    licenseNo: "LIC-2047",
-    notes: "Team 2 koordinatörü",
-    company: "UTEK",
-    team: "Team 2",
-    vehiclePlate: "34 DEF 456",
-    credentials: sampleCredentials["2"],
-    createdAt: "2026-08-01T10:00:00.000Z",
-    updatedAt: "2026-08-01T10:00:00.000Z",
-  },
-  {
-    id: "3",
-    sourceSequence: 3,
-    nationalId: "32345678901",
-    firstName: "Deniz",
-    lastName: "Arslan",
-    phone: "+905553456789",
-    email: "deniz.arslan@pilotweather.pro",
-    birthDate: "1992-10-12",
-    tshirtSize: "M",
-    licenseNo: "LIC-3098",
-    notes: "Team 3 operasyon destek",
-    company: "TUA",
-    team: "Team 3",
-    vehiclePlate: null,
-    credentials: sampleCredentials["3"],
-    createdAt: "2026-08-01T10:00:00.000Z",
-    updatedAt: "2026-08-01T10:00:00.000Z",
-  },
-  {
-    id: "4",
-    sourceSequence: 4,
-    nationalId: "42345678901",
-    firstName: "Ece",
-    lastName: "Demir",
-    phone: "+905554567890",
-    email: "ece.demir@pilotweather.pro",
-    birthDate: "1987-02-18",
-    tshirtSize: "S",
-    licenseNo: "LIC-4182",
-    notes: "Team 4 eğitim planlaması",
-    company: "GDH",
-    team: "Team 4",
-    vehiclePlate: "34 GHI 789",
-    credentials: sampleCredentials["4"],
-    createdAt: "2026-08-01T10:00:00.000Z",
-    updatedAt: "2026-08-01T10:00:00.000Z",
-  },
-  {
-    id: "5",
-    sourceSequence: 5,
-    nationalId: "52345678901",
-    firstName: "Faruk",
-    lastName: "Öztürk",
-    phone: "+905555678901",
-    email: "faruk.ozturk@pilotweather.pro",
-    birthDate: "1985-11-03",
-    tshirtSize: "XL",
-    licenseNo: "LIC-5124",
-    notes: "Team 1 operasyon sorumlusu",
-    company: "OMAŞ",
-    team: "Team 1",
-    vehiclePlate: "34 JKL 012",
-    credentials: sampleCredentials["5"],
-    createdAt: "2026-08-01T10:00:00.000Z",
-    updatedAt: "2026-08-01T10:00:00.000Z",
-  },
-  {
-    id: "6",
-    sourceSequence: 6,
-    nationalId: "62345678901",
-    firstName: "Merve",
-    lastName: "Şen",
-    phone: "+905556789012",
-    email: "merve.sen@pilotweather.pro",
-    birthDate: null,
-    tshirtSize: "M",
-    licenseNo: "LIC-6209",
-    notes: null,
-    company: "UTEK",
-    team: "Team 2",
-    vehiclePlate: null,
-    credentials: [
-      { id: "sep-6", type: "SEP", expiryDate: "2026-08-12" },
-      { id: "sep-fi-6", type: "SEP_FI", expiryDate: "2027-02-28" },
-      { id: "class-1-6", type: "CLASS_1", expiryDate: "2026-11-27" },
-    ],
-    createdAt: "2026-08-02T10:00:00.000Z",
-    updatedAt: "2026-08-02T10:00:00.000Z",
-  },
-];
-
-export async function getPersonnelList() {
-  return samplePersonnel;
+interface SnapshotPersonnel {
+  sourceSequence: number;
+  nationalId: string;
+  firstName: string;
+  lastName: string;
+  phone: string | null;
+  team: string;
+  company: string;
+  email: string | null;
+  birthDate: string | null;
+  tshirtSize: string | null;
+  vehiclePlate: string | null;
+  notes: string | null;
+  licenseNo: string | null;
+  credentials: Array<{ type: PersonnelCredentialType; expiryDate: string | null }>;
 }
 
-export async function getPersonnelById(id: string) {
-  return samplePersonnel.find((person) => person.id === id) ?? null;
+function maskPhone(phone: string | null): string | null {
+  if (!phone) return null;
+  let visibleDigits = 4;
+  return [...phone].reverse().map((character) => {
+    if (!/\d/.test(character)) return character;
+    if (visibleDigits > 0) {
+      visibleDigits -= 1;
+      return character;
+    }
+    return "•";
+  }).reverse().join("");
+}
+
+function snapshotToPublic(row: SnapshotPersonnel): Personnel {
+  const timestamp = new Date(0).toISOString();
+  return {
+    id: `source-${row.sourceSequence}`,
+    sourceSequence: row.sourceSequence,
+    firstName: row.firstName,
+    lastName: row.lastName,
+    phone: maskPhone(row.phone),
+    email: row.email,
+    birthDate: row.birthDate,
+    tshirtSize: row.tshirtSize,
+    licenseNo: row.licenseNo,
+    notes: row.notes,
+    company: row.company,
+    team: row.team,
+    vehiclePlate: row.vehiclePlate,
+    credentials: row.credentials.map((credential) => ({
+      id: `${credential.type.toLowerCase()}-${row.sourceSequence}`,
+      type: credential.type,
+      expiryDate: credential.expiryDate,
+    })),
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  };
+}
+
+async function readSnapshot(): Promise<Personnel[]> {
+  const snapshotPath = path.join(process.cwd(), "data", "parsed-personnel.json");
+  try {
+    const raw = await fs.readFile(snapshotPath, "utf8");
+    return (JSON.parse(raw) as SnapshotPersonnel[]).map(snapshotToPublic);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return [];
+    throw error;
+  }
+}
+
+async function readDatabase(): Promise<Personnel[]> {
+  const rows = await prisma.personnel.findMany({
+    orderBy: [{ sourceSequence: "asc" }, { lastName: "asc" }],
+    select: {
+      id: true, sourceSequence: true, firstName: true, lastName: true, phone: true,
+      email: true, birthDate: true, tshirtSize: true, licenseNo: true, notes: true,
+      createdAt: true, updatedAt: true,
+      company: { select: { name: true } },
+      team: { select: { name: true } },
+      vehicles: { where: { active: true }, select: { plate: true } },
+      credentials: { select: { id: true, type: true, expiryDate: true } },
+    },
+  });
+  return rows.map((row) => ({
+    id: row.id,
+    sourceSequence: row.sourceSequence,
+    firstName: row.firstName,
+    lastName: row.lastName,
+    phone: maskPhone(row.phone),
+    email: row.email,
+    birthDate: row.birthDate?.toISOString().slice(0, 10) ?? null,
+    tshirtSize: row.tshirtSize,
+    licenseNo: row.licenseNo,
+    notes: row.notes,
+    company: row.company?.name ?? null,
+    team: row.team?.name ?? null,
+    vehiclePlate: row.vehicles.map((vehicle) => vehicle.plate).join(" - ") || null,
+    credentials: row.credentials.map((credential) => ({
+      id: credential.id,
+      type: credential.type as PersonnelCredentialType,
+      expiryDate: credential.expiryDate?.toISOString().slice(0, 10) ?? null,
+    })),
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+  }));
+}
+
+export async function getPersonnelList(): Promise<Personnel[]> {
+  if (process.env.DATABASE_URL) return readDatabase();
+  if (process.env.NODE_ENV !== "production" && process.env.USE_PERSONNEL_SNAPSHOT === "true") {
+    return readSnapshot();
+  }
+  throw new Error(
+    "DATABASE_URL is required. For an explicit local-only fallback, set USE_PERSONNEL_SNAPSHOT=true.",
+  );
+}
+
+export async function getPersonnelById(id: string): Promise<Personnel | null> {
+  return (await getPersonnelList()).find((person) => person.id === id) ?? null;
 }

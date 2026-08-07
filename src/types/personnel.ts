@@ -9,7 +9,6 @@ export interface PersonnelCredential {
 export interface Personnel {
   id: string;
   sourceSequence: number | null;
-  nationalId: string | null;
   firstName: string;
   lastName: string;
   phone: string | null;

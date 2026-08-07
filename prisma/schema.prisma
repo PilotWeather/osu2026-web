@@ -8,59 +8,75 @@ datasource db {
 }
 
 model Company {
-  id        String   @id @default(cuid())
-  name      String   @unique
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id        String      @id @default(cuid())
+  name      String      @unique
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
   personnel Personnel[]
 }
 
 model Team {
-  id        String   @id @default(cuid())
-  name      String   @unique
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id        String      @id @default(cuid())
+  name      String      @unique
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
   personnel Personnel[]
 }
 
 model Personnel {
-  id              String        @id @default(cuid())
-  sourceSequence  Int?
-  nationalId      String?       @unique
-  firstName       String
-  lastName        String
-  phone           String?
-  email           String?
-  birthDate       DateTime?
-  tshirtSize      String?
-  licenseNo       String?
-  notes           String?
-  companyId       String?
-  teamId          String?
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
-  company         Company?      @relation(fields: [companyId], references: [id])
-  team            Team?         @relation(fields: [teamId], references: [id])
-  vehicles        Vehicle[]
-  credentials     Credential[]
+  id             String       @id @default(cuid())
+  sourceKey      String       @unique
+  sourceSequence Int?
+  nationalId     String?      @unique
+  firstName      String
+  lastName       String
+  phone          String?
+  email          String?
+  birthDate      DateTime?
+  tshirtSize     String?
+  licenseNo      String?      @unique
+  notes          String?
+  companyId      String?
+  teamId         String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  company        Company?     @relation(fields: [companyId], references: [id])
+  team           Team?        @relation(fields: [teamId], references: [id])
+  vehicles       Vehicle[]
+  credentials    Credential[]
+
+  @@index([companyId])
+  @@index([teamId])
 }
 
 model Vehicle {
-  id           String   @id @default(cuid())
-  personnelId  String
-  plate        String
-  active       Boolean  @default(true)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  personnel    Personnel @relation(fields: [personnelId], references: [id], onDelete: Cascade)
+  id          String    @id @default(cuid())
+  personnelId String
+  plate       String
+  active      Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  personnel   Personnel @relation(fields: [personnelId], references: [id], onDelete: Cascade)
+
+  @@unique([personnelId, plate])
+  @@index([personnelId, active])
 }
 
 model Credential {
-  id           String   @id @default(cuid())
-  personnelId  String
-  type         String
-  expiryDate   DateTime?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  personnel    Personnel @relation(fields: [personnelId], references: [id], onDelete: Cascade)
+  id          String         @id @default(cuid())
+  personnelId String
+  type        CredentialType
+  expiryDate  DateTime?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  personnel   Personnel      @relation(fields: [personnelId], references: [id], onDelete: Cascade)
+
+  @@unique([personnelId, type])
+  @@index([type, expiryDate])
+}
+
+enum CredentialType {
+  SEP
+  SEP_FI
+  CLASS_1
 }
