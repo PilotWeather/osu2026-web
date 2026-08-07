@@ -5,11 +5,11 @@ import { UserRole } from "@prisma/client";
 import { auth } from "@/auth";
 import { prisma } from "@/src/lib/db";
 
-export type Permission = "VIEW_DASHBOARD" | "IMPORT_PDF" | "IMPORT_EXCEL" | "EDIT_PERSONNEL" | "MANAGE_USERS";
+export type Permission = "VIEW_DASHBOARD" | "IMPORT_PDF" | "IMPORT_EXCEL" | "EDIT_PERSONNEL" | "EDIT_FLIGHTS" | "MANAGE_USERS";
 
 const rolePermissions: Record<UserRole, ReadonlySet<Permission>> = {
-  ADMIN: new Set(["VIEW_DASHBOARD", "IMPORT_PDF", "IMPORT_EXCEL", "EDIT_PERSONNEL", "MANAGE_USERS"]),
-  DATA_MANAGER: new Set(["VIEW_DASHBOARD", "IMPORT_PDF", "IMPORT_EXCEL", "EDIT_PERSONNEL"]),
+  ADMIN: new Set(["VIEW_DASHBOARD", "IMPORT_PDF", "IMPORT_EXCEL", "EDIT_PERSONNEL", "EDIT_FLIGHTS", "MANAGE_USERS"]),
+  DATA_MANAGER: new Set(["VIEW_DASHBOARD", "IMPORT_PDF", "IMPORT_EXCEL", "EDIT_PERSONNEL", "EDIT_FLIGHTS"]),
   VIEWER: new Set(["VIEW_DASHBOARD"]),
 };
 

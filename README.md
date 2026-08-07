@@ -66,3 +66,12 @@ npm run build
 ```
 
 Production domain: <https://osu2026.pilotweather.pro>
+# Completed flight PDF testing
+
+Place a real, text-based daily completed-flight record PDF under `data/flights/`, for example:
+
+```text
+data/flights/2026-08-07-daily-flights.pdf
+```
+
+Files matching `data/flights/*.pdf` are ignored by Git. In the running application, ADMIN and DATA_MANAGER users upload the same PDF from `/imports`; parsing creates a persisted review batch and does not create Flight records until confirmation.

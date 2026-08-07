@@ -24,27 +24,29 @@ model Team {
 }
 
 model Personnel {
-  id             String       @id @default(cuid())
-  sourceKey      String       @unique
-  sourceSequence Int?
-  nationalId     String?      @unique
-  firstName      String
-  lastName       String
-  phone          String?
-  email          String?
-  birthDate      DateTime?
-  tshirtSize     String?
-  licenseNo      String?
-  notes          String?
-  isActiveFlying Boolean      @default(false)
-  companyId      String?
-  teamId         String?
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
-  company        Company?     @relation(fields: [companyId], references: [id])
-  team           Team?        @relation(fields: [teamId], references: [id])
-  vehicles       Vehicle[]
-  credentials    Credential[]
+  id                String       @id @default(cuid())
+  sourceKey         String       @unique
+  sourceSequence    Int?
+  nationalId        String?      @unique
+  firstName         String
+  lastName          String
+  phone             String?
+  email             String?
+  birthDate         DateTime?
+  tshirtSize        String?
+  licenseNo         String?
+  notes             String?
+  isActiveFlying    Boolean      @default(false)
+  companyId         String?
+  teamId            String?
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+  company           Company?     @relation(fields: [companyId], references: [id])
+  team              Team?        @relation(fields: [teamId], references: [id])
+  vehicles          Vehicle[]
+  credentials       Credential[]
+  instructedFlights Flight[]     @relation("FlightInstructor")
+  importRows        ImportRow[]
 
   @@index([companyId])
   @@index([teamId])
@@ -97,14 +99,135 @@ model AuthorizedUser {
   @@index([role])
 }
 
+model Aircraft {
+  id           String   @id @default(cuid())
+  registration String   @unique
+  aircraftType String?
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  flights      Flight[]
+
+  @@index([active])
+}
+
+model Student {
+  id             String   @id @default(cuid())
+  normalizedName String   @unique
+  displayName    String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  flights        Flight[]
+}
+
+model ImportBatch {
+  id               String       @id @default(cuid())
+  originalFilename String
+  fileHash         String
+  flightDate       DateTime?
+  status           ImportStatus @default(PENDING)
+  totalRows        Int          @default(0)
+  validRows        Int          @default(0)
+  importedRows     Int          @default(0)
+  warningRows      Int          @default(0)
+  rejectedRows     Int          @default(0)
+  uploadedByUserId String?
+  createdAt        DateTime     @default(now())
+  completedAt      DateTime?
+  uploadedBy       User?        @relation(fields: [uploadedByUserId], references: [id], onDelete: SetNull)
+  rows             ImportRow[]
+  flights          Flight[]
+
+  @@index([fileHash, status])
+  @@index([createdAt])
+  @@index([flightDate])
+  @@index([uploadedByUserId])
+}
+
+model ImportRow {
+  id                   String          @id @default(cuid())
+  importBatchId        String
+  rowNumber            Int
+  status               ImportRowStatus
+  rawData              Json
+  normalizedInstructor String?
+  instructorId         String?
+  warning              String?
+  createdAt            DateTime        @default(now())
+  updatedAt            DateTime        @updatedAt
+  importBatch          ImportBatch     @relation(fields: [importBatchId], references: [id], onDelete: Cascade)
+  instructor           Personnel?      @relation(fields: [instructorId], references: [id], onDelete: SetNull)
+
+  @@unique([importBatchId, rowNumber])
+  @@index([importBatchId, status])
+  @@index([instructorId])
+}
+
+model Flight {
+  id                      String      @id @default(cuid())
+  signature               String      @unique
+  flightDate              DateTime
+  sourceSortieNo          String?
+  sourceFlightType        String?
+  aircraftId              String
+  instructorId            String?
+  studentId               String?
+  studentName             String?
+  departureAirport        String?
+  arrivalAirport          String?
+  takeoffTime             DateTime?
+  landingTime             DateTime?
+  airborneDurationMinutes Int?
+  groundDurationMinutes   Int?
+  sortieDurationMinutes   Int?
+  flightRules             String?
+  runway                  String?
+  frequency               String?
+  remarks                 String?
+  importBatchId           String
+  archivedAt              DateTime?
+  createdAt               DateTime    @default(now())
+  updatedAt               DateTime    @updatedAt
+  aircraft                Aircraft    @relation(fields: [aircraftId], references: [id])
+  instructor              Personnel?  @relation("FlightInstructor", fields: [instructorId], references: [id], onDelete: SetNull)
+  student                 Student?    @relation(fields: [studentId], references: [id], onDelete: SetNull)
+  importBatch             ImportBatch @relation(fields: [importBatchId], references: [id])
+
+  @@index([flightDate])
+  @@index([aircraftId])
+  @@index([instructorId])
+  @@index([studentId])
+  @@index([importBatchId])
+  @@index([takeoffTime])
+  @@index([landingTime])
+  @@index([archivedAt])
+}
+
+enum ImportStatus {
+  PENDING
+  PARSED
+  REVIEW_REQUIRED
+  IMPORTED
+  FAILED
+}
+
+enum ImportRowStatus {
+  READY
+  REVIEW
+  INVALID
+  IMPORTED
+  DUPLICATE
+}
+
 model User {
-  id            String    @id @default(cuid())
+  id            String        @id @default(cuid())
   name          String?
-  email         String?   @unique
+  email         String?       @unique
   emailVerified DateTime?
   image         String?
   accounts      Account[]
   sessions      Session[]
+  importBatches ImportBatch[]
 }
 
 model Account {

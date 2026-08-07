@@ -1,0 +1,19 @@
+"use client";
+
+import { useState } from "react";
+import Link from "next/link";
+
+export interface FlightListItem {
+  id: string; date: string; sortie: string; aircraft: string; aircraftType: string | null;
+  instructor: string; student: string; takeoff: string; landing: string; duration: string;
+  departure: string; arrival: string; rules: string; runway: string; frequency: string; remarks: string;
+  airborne: string; ground: string; batch: string;
+}
+
+export function FlightsTable({ flights, canEdit }: { flights: FlightListItem[]; canEdit: boolean }) {
+  const [selected, setSelected] = useState<FlightListItem | null>(null);
+  return <>
+    <div className="overflow-x-auto"><table className="min-w-full text-left text-sm"><thead className="sticky top-0 bg-slate-50 text-xs uppercase tracking-wider text-slate-500 dark:bg-slate-800/90"><tr>{["Tarih","Sorti","Uçak","Öğretmen","Öğrenci","Kalkış","İniş","Süre"].map(label=><th key={label} className="px-4 py-3">{label}</th>)}</tr></thead><tbody className="divide-y divide-slate-100 dark:divide-slate-800">{flights.map(flight=><tr key={flight.id} tabIndex={0} role="button" onClick={()=>setSelected(flight)} onKeyDown={event=>{if(event.key==="Enter"){setSelected(flight)}}} className="cursor-pointer hover:bg-blue-50/60 focus-visible:bg-blue-50 dark:hover:bg-blue-500/10 dark:focus-visible:bg-blue-500/10"><td className="px-4 py-3">{flight.date}</td><td className="px-4 py-3">{flight.sortie}</td><td className="px-4 py-3 font-semibold">{flight.aircraft}</td><td className="px-4 py-3">{flight.instructor}</td><td className="px-4 py-3">{flight.student}</td><td className="px-4 py-3">{flight.takeoff}</td><td className="px-4 py-3">{flight.landing}</td><td className="px-4 py-3 font-semibold">{flight.duration}</td></tr>)}</tbody></table>{flights.length === 0 ? <p className="p-8 text-center text-sm text-slate-500">Filtrelerle eşleşen uçuş bulunamadı.</p> : null}</div>
+    {selected ? <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/50 p-4 sm:items-center" onMouseDown={event=>{if(event.target===event.currentTarget)setSelected(null)}}><div role="dialog" aria-modal="true" className="max-h-[90vh] w-full max-w-2xl overflow-auto rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl dark:border-slate-700 dark:bg-slate-900"><div className="flex justify-between gap-4"><div><p className="text-sm font-semibold uppercase tracking-wider text-blue-600 dark:text-blue-400">Tamamlanan Uçuş</p><h2 className="mt-1 text-2xl font-semibold">{selected.aircraft} · Sorti {selected.sortie}</h2></div><div className="flex gap-2">{canEdit ? <Link href={`/flights/${selected.id}/edit`} className="rounded-xl bg-blue-600 px-3 py-1.5 text-sm font-semibold text-white">Düzelt</Link> : null}<button onClick={()=>setSelected(null)} className="rounded-xl border border-slate-300 px-3 py-1.5 text-sm dark:border-slate-700">Kapat</button></div></div><dl className="mt-6 grid gap-3 sm:grid-cols-2">{[["Tarih",selected.date],["Uçak tipi",selected.aircraftType ?? "-"],["Öğretmen",selected.instructor],["Öğrenci",selected.student],["Rota",`${selected.departure} → ${selected.arrival}`],["Kalkış / İniş",`${selected.takeoff} / ${selected.landing}`],["Sorti / Havada / Yer",`${selected.duration} / ${selected.airborne} / ${selected.ground}`],["Kurallar / Pist",`${selected.rules} / ${selected.runway}`],["Frekans",selected.frequency],["Kaynak",selected.batch]].map(([label,value])=><div key={label} className="rounded-xl bg-slate-50 p-3 dark:bg-slate-800"><dt className="text-xs uppercase text-slate-500">{label}</dt><dd className="mt-1 text-sm font-medium">{value}</dd></div>)}</dl>{selected.remarks!=="-"?<div className="mt-3 rounded-xl bg-slate-50 p-3 dark:bg-slate-800"><p className="text-xs uppercase text-slate-500">Açıklama</p><p className="mt-1 text-sm">{selected.remarks}</p></div>:null}</div></div> : null}
+  </>;
+}

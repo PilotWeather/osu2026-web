@@ -42,4 +42,5 @@ next-env.d.ts
 
 # local source files
 /data/*.pdf
+/data/flights/*.pdf
 /data/parsed-personnel.json
