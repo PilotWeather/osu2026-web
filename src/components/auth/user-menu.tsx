@@ -1,4 +1,5 @@
 import Image from "next/image";
+import Link from "next/link";
 import { auth, signOut } from "@/auth";
 import { getAuthorizedUser } from "@/src/lib/authz";
 
@@ -33,6 +34,11 @@ export async function UserMenu() {
         </p>
         <p className="text-xs text-slate-500 dark:text-slate-400">{roleLabels[user.role]}</p>
       </div>
+      {user.role === "ADMIN" ? (
+        <Link href="/admin/users" className="rounded-xl px-2.5 py-2 text-xs font-semibold text-blue-600 hover:bg-blue-50 focus-visible:ring-2 focus-visible:ring-blue-600 dark:text-blue-400 dark:hover:bg-blue-500/10 dark:focus-visible:ring-blue-400">
+          Admin · Users
+        </Link>
+      ) : null}
       <form
         action={async () => {
           "use server";
