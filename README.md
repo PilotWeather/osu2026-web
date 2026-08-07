@@ -1,36 +1,77 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# ÖSU 2026
 
-## Getting Started
+## Overview
 
-First, run the development server:
+This project contains a polished MVP for managing ÖSU 2026 flight instructor personnel. The interface focuses on a professional admin experience with search, team/company filters, credential expiry visibility, and a detail drawer for each instructor.
+
+The current implementation uses a local development dataset for the UI and exposes a service layer that is ready for a PostgreSQL/Prisma backend when a connection string is available.
+
+## Development
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open http://localhost:3000 to view the dashboard.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Environment Variables
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Create a local environment file using the template:
 
-## Learn More
+```bash
+cp .env.example .env.local
+```
 
-To learn more about Next.js, take a look at the following resources:
+Add your PostgreSQL connection string:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```env
+DATABASE_URL="postgresql://..."
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Database
 
-## Deploy on Vercel
+The project includes a Prisma schema for:
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- Company
+- Team
+- Personnel
+- Vehicle
+- Credential
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+The schema is designed to be portable and ready for PostgreSQL.
+
+## Prisma
+
+Generate the Prisma client:
+
+```bash
+npx prisma generate
+```
+
+Seed the database once a PostgreSQL connection is available:
+
+```bash
+npx prisma db push
+npx prisma db seed
+```
+
+## Importing Personnel
+
+The import utility is available in scripts/import-personnel.ts. It is structured to support future Excel import flows and currently normalizes tabular input for future spreadsheet ingestion.
+
+Example:
+
+```bash
+npx tsx scripts/import-personnel.ts ./data/personnel.tsv
+```
+
+## Deployment
+
+The project is designed for Vercel and the production domain is:
+
+https://osu2026.pilotweather.pro
+
+## Domain
+
+Production domain: https://osu2026.pilotweather.pro
