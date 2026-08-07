@@ -20,7 +20,7 @@ export function operationalDateTime(date: string, time: string | null): Date | n
   const minutes = parseHHMM(time);
   if (minutes === null) return null;
   const [year, month, day] = date.split("-").map(Number);
-  return new Date(Date.UTC(year, month - 1, day, Math.floor(minutes / 60) - 3, minutes % 60));
+  return new Date(Date.UTC(year, month - 1, day, Math.floor(minutes / 60), minutes % 60));
 }
 
 export function formatOperationalTime(value: Date | string | null): string {
@@ -28,7 +28,7 @@ export function formatOperationalTime(value: Date | string | null): string {
   return new Intl.DateTimeFormat("tr-TR", {
     hour: "2-digit",
     minute: "2-digit",
-    timeZone: "Europe/Istanbul",
+    timeZone: "UTC",
     hour12: false,
   }).format(new Date(value));
 }

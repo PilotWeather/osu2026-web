@@ -8,12 +8,12 @@ interface OperationsPageProps { searchParams: Promise<{ date?: string; sort?: st
 export default async function OperationsPage({ searchParams }: OperationsPageProps) {
   await connection(); await requirePermission("VIEW_DASHBOARD");
   const query = await searchParams;
-  const latest = await prisma.flight.findFirst({ where:{archivedAt:null}, orderBy:{flightDate:"desc"}, select:{flightDate:true} });
+  const latest = await prisma.flight.findFirst({ where:{archivedAt:null,status:"COMPLETED"}, orderBy:{flightDate:"desc"}, select:{flightDate:true} });
   const selectedDate = query.date?.match(/^\d{4}-\d{2}-\d{2}$/) ? query.date : latest?.flightDate.toISOString().slice(0,10);
-  const flights = selectedDate ? await prisma.flight.findMany({where:{flightDate:new Date(`${selectedDate}T00:00:00.000Z`),archivedAt:null},include:{aircraft:true,instructor:true,student:true},orderBy:query.sort==="landing"?{landingTime:"asc"}:{takeoffTime:"asc"}}) : [];
+  const flights = selectedDate ? await prisma.flight.findMany({where:{flightDate:new Date(`${selectedDate}T00:00:00.000Z`),archivedAt:null,status:"COMPLETED"},include:{aircraft:true,instructor:true,student:true},orderBy:query.sort==="landing"?{landingTime:"asc"}:{takeoffTime:"asc"}}) : [];
   const totalMinutes=flights.reduce((sum,f)=>sum+(f.sortieDurationMinutes??0),0);
   const instructors=new Set(flights.map(f=>f.instructorId).filter(Boolean)); const students=new Set(flights.map(f=>f.studentId??f.studentName).filter(Boolean)); const aircraft=new Set(flights.map(f=>f.aircraftId));
-  const hourly=new Map<number,number>(); for(const flight of flights){if(flight.landingTime){const hour=Number(new Intl.DateTimeFormat("en-GB",{hour:"2-digit",hour12:false,timeZone:"Europe/Istanbul"}).format(flight.landingTime));hourly.set(hour,(hourly.get(hour)??0)+1)}}
+  const hourly=new Map<number,number>(); for(const flight of flights){if(flight.landingTime){const hour=Number(new Intl.DateTimeFormat("en-GB",{hour:"2-digit",hour12:false,timeZone:"UTC"}).format(flight.landingTime));hourly.set(hour,(hourly.get(hour)??0)+1)}}
   const hours=hourly.size?Array.from({length:Math.max(...hourly.keys())-Math.min(...hourly.keys())+1},(_,i)=>Math.min(...hourly.keys())+i):[]; const maxHour=Math.max(1,...hourly.values());
   const cards=[["Toplam Sorti",flights.length],["Toplam Uçuş Süresi",formatDuration(totalMinutes)],["Uçan FI",instructors.size],["Uçan Öğrenci",students.size],["Kullanılan Uçak",aircraft.size],["Ortalama Sorti Süresi",formatDuration(flights.length?Math.round(totalMinutes/flights.length):0)]];
   return <main className="min-h-screen bg-slate-50 px-4 py-6 dark:bg-[#0b0f19] sm:px-6 lg:px-8"><div className="mx-auto max-w-7xl space-y-6"><AppHeader title="Operasyon Dashboard" subtitle="Tamamlanmış uçuşların günlük görünümü" />

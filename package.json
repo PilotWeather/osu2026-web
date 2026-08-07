@@ -15,10 +15,12 @@
     "prisma:migrate:status": "prisma migrate status",
     "auth:seed-admin": "node --no-warnings scripts/seed-authorized-user.ts",
     "seed:admin": "node --no-warnings scripts/seed-authorized-user.ts",
-    "import:personnel": "node --no-warnings scripts/import-personnel-from-pdf.ts"
+    "import:personnel": "node --no-warnings scripts/import-personnel-from-pdf.ts",
+    "test:flight-parser": "node --env-file=.env.local --import tsx scripts/test-flight-parser.ts"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.3",
+    "@napi-rs/canvas": "^1.0.3",
     "@prisma/client": "^5.22.0",
     "next": "16.3.0",
     "next-auth": "^5.0.0-beta.32",
@@ -37,6 +39,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.3.0",
     "tailwindcss": "^4",
+    "tsx": "^4.23.11",
     "typescript": "^5"
   }
 }

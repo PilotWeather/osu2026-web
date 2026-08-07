@@ -1,6 +1,6 @@
 "use server";
 
-import { ImportRowStatus, ImportStatus, Prisma, UserRole } from "@prisma/client";
+import { FlightStatus, ImportRowStatus, ImportStatus, Prisma, UserRole } from "@prisma/client";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { requirePermission } from "@/src/lib/authz";
@@ -34,16 +34,16 @@ export async function uploadFlightPdf(formData: FormData): Promise<void> {
   });
   if (duplicate) messageRedirect("/imports", "error", "Bu dosya daha önce içe aktarılmış.");
 
+  const personnel = await prisma.personnel.findMany({ select: { id: true, firstName: true, lastName: true } });
   let parsed;
   try {
-    parsed = await parseCompletedFlightsPdf(data);
+    parsed = await parseCompletedFlightsPdf(data, personnel.map((person) => `${person.firstName} ${person.lastName}`));
   } catch {
     messageRedirect("/imports", "error", "PDF metni okunamadı. Dosyanın metin tabanlı olduğundan emin olun.");
   }
   if (!parsed.rows.length) {
     messageRedirect("/imports", "error", parsed.warnings[0] ?? "PDF içinde uçuş satırı bulunamadı.");
   }
-  const personnel = await prisma.personnel.findMany({ select: { id: true, firstName: true, lastName: true } });
   const personnelByName = new Map<string, string[]>();
   for (const person of personnel) {
     const key = normalizePersonName(`${person.firstName} ${person.lastName}`);
@@ -51,6 +51,7 @@ export async function uploadFlightPdf(formData: FormData): Promise<void> {
   }
 
   const prepared = parsed.rows.map((row) => {
+    if (row.flightStatus === "CANCELLED") return { row, normalized: "", instructorId: null, warning: null, status: ImportRowStatus.CANCELLED };
     const normalized = normalizedParsedInstructor(row);
     const matches = normalized ? personnelByName.get(normalized) ?? [] : [];
     const instructorId = matches.length === 1 ? matches[0] : null;
@@ -64,10 +65,10 @@ export async function uploadFlightPdf(formData: FormData): Promise<void> {
     const status = !row.valid ? ImportRowStatus.INVALID : warning ? ImportRowStatus.REVIEW : ImportRowStatus.READY;
     return { row, normalized, instructorId, warning, status };
   });
-  const validRows = prepared.filter((item) => item.status !== ImportRowStatus.INVALID).length;
+  const validRows = prepared.filter((item) => item.row.flightStatus === "COMPLETED" && item.status !== ImportRowStatus.INVALID).length;
   const warningRows = prepared.filter((item) => item.status === ImportRowStatus.REVIEW).length;
   const rejectedRows = prepared.filter((item) => item.status === ImportRowStatus.INVALID).length;
-  const batchStatus = prepared.length && warningRows === 0 && rejectedRows === 0 ? ImportStatus.PARSED : ImportStatus.REVIEW_REQUIRED;
+  const batchStatus = parsed.validation.passed && warningRows === 0 && rejectedRows === 0 ? ImportStatus.PARSED : ImportStatus.REVIEW_REQUIRED;
   const flightDate = parsed.flightDate ? new Date(`${parsed.flightDate}T00:00:00.000Z`) : null;
 
   const batch = await prisma.importBatch.create({
@@ -77,6 +78,11 @@ export async function uploadFlightPdf(formData: FormData): Promise<void> {
       flightDate,
       status: batchStatus,
       totalRows: prepared.length,
+      sourceRows: parsed.validation.scheduledRows,
+      completedRows: parsed.validation.completedRows,
+      cancelledRows: parsed.validation.cancelledRows,
+      validationDurationMinutes: parsed.validation.completedDurationMinutes,
+      validationPassed: parsed.validation.passed,
       validRows,
       warningRows,
       rejectedRows,
@@ -101,6 +107,7 @@ export async function confirmFlightImport(batchId: string, formData: FormData): 
   const batch = await prisma.importBatch.findUnique({ where: { id: batchId }, include: { rows: true } });
   if (!batch) messageRedirect("/imports", "error", "İçe aktarma kaydı bulunamadı.");
   if (batch.status === ImportStatus.IMPORTED) messageRedirect(`/imports/${batch.id}`, "error", "Bu dosya daha önce içe aktarılmış.");
+  if (!batch.validationPassed) messageRedirect(`/imports/${batch.id}`, "error", "PDF doğrulaması başarısız; veritabanına yazılmadı.");
   const priorImported = await prisma.importBatch.findFirst({ where: { fileHash: batch.fileHash, status: ImportStatus.IMPORTED, id: { not: batch.id } } });
   if (priorImported) messageRedirect("/imports", "error", "Bu dosya daha önce içe aktarılmış.");
 
@@ -110,7 +117,7 @@ export async function confirmFlightImport(batchId: string, formData: FormData): 
     const value = String(formData.get(`instructor_${row.id}`) ?? "");
     selected.set(row.id, personnelIds.has(value) ? value : row.instructorId);
     const raw = row.rawData as unknown as ParsedFlightRow;
-    if (row.status !== ImportRowStatus.INVALID && raw.instructorName && !selected.get(row.id)) {
+    if (raw.flightStatus === "COMPLETED" && row.status !== ImportRowStatus.INVALID && raw.instructorName && !selected.get(row.id)) {
       messageRedirect(`/imports/${batch.id}`, "error", "Tüm eşleşmeyen öğretmenleri seçin.");
     }
   }
@@ -154,7 +161,11 @@ export async function confirmFlightImport(batchId: string, formData: FormData): 
       await tx.flight.create({
         data: {
           signature,
+          status: raw.flightStatus === "CANCELLED" ? FlightStatus.CANCELLED : FlightStatus.COMPLETED,
           flightDate: new Date(`${raw.flightDate}T00:00:00.000Z`),
+          sourceFlightCode: raw.sourceFlightCode,
+          sourceTeam: raw.sourceTeam,
+          trainingTask: raw.trainingTask,
           sourceSortieNo: raw.sourceSortieNo,
           sourceFlightType: raw.sourceFlightType,
           aircraftId: aircraft.id,
@@ -176,7 +187,7 @@ export async function confirmFlightImport(batchId: string, formData: FormData): 
         },
       });
       await tx.importRow.update({ where: { id: row.id }, data: { status: ImportRowStatus.IMPORTED, instructorId } });
-      importedRows += 1;
+      if (raw.flightStatus === "COMPLETED") importedRows += 1;
     }
     await tx.importBatch.update({
       where: { id: batch.id },

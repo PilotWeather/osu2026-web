@@ -14,6 +14,7 @@ export default async function FlightsPage({ searchParams }: FlightsPageProps) {
   const flights = await prisma.flight.findMany({
     where: {
       archivedAt: null,
+      status: "COMPLETED",
       ...(date ? { flightDate: new Date(`${date}T00:00:00.000Z`) } : {}),
       ...(q.instructor ? { instructorId: q.instructor } : {}), ...(q.student ? { studentId: q.student } : {}), ...(q.aircraft ? { aircraftId: q.aircraft } : {}),
       ...(q.team ? { instructor: { teamId: q.team } } : {}), ...(q.company ? { instructor: { companyId: q.company } } : {}),
