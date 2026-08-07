@@ -11,6 +11,7 @@ export interface Personnel {
   sourceSequence: number | null;
   firstName: string;
   lastName: string;
+  nationalId: string | null;
   phone: string | null;
   email: string | null;
   birthDate: string | null;

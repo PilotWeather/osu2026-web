@@ -26,11 +26,16 @@ export function PersonnelDetail({ person, onClose }: PersonnelDetailProps) {
     ["Şirket", person.company ?? "-"],
     ["Ekip", person.team ?? "-"],
     ["E-posta", person.email ?? "-"],
-    ["Telefon", person.phone ? person.phone.replace(/\d(?=\d{4})/g, "•") : "-"],
+    // TODO(public-release): Mask national ID and phone before this system is exposed publicly.
+    ["Telefon", person.phone ?? "-"],
+    ["T.C. Kimlik No", person.nationalId ?? "-"],
     ["Doğum tarihi", formatDate(person.birthDate)],
     ["T-shirt bedeni", person.tshirtSize ?? "-"],
     ["Araç plakası", person.vehiclePlate ?? "-"],
     ["Lisans numarası", person.licenseNo ?? "-"],
+    ["Kaynak sıra", person.sourceSequence?.toString() ?? "-"],
+    ["Oluşturulma", formatDate(person.createdAt)],
+    ["Güncellenme", formatDate(person.updatedAt)],
   ];
 
   return (

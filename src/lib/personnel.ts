@@ -1,18 +1,6 @@
 import { prisma } from "@/src/lib/db";
+import { requirePermission } from "@/src/lib/authz";
 import type { Personnel, PersonnelCredentialType } from "@/src/types/personnel";
-
-function maskPhone(phone: string | null): string | null {
-  if (!phone) return null;
-  let visibleDigits = 4;
-  return [...phone].reverse().map((character) => {
-    if (!/\d/.test(character)) return character;
-    if (visibleDigits > 0) {
-      visibleDigits -= 1;
-      return character;
-    }
-    return "•";
-  }).reverse().join("");
-}
 
 function requireDatabaseUrl(): void {
   if (!process.env.DATABASE_URL) {
@@ -24,10 +12,11 @@ function requireDatabaseUrl(): void {
 
 export async function getPersonnelList(): Promise<Personnel[]> {
   requireDatabaseUrl();
+  await requirePermission("VIEW_DASHBOARD");
   const rows = await prisma.personnel.findMany({
     orderBy: [{ sourceSequence: "asc" }, { lastName: "asc" }],
     select: {
-      id: true, sourceSequence: true, firstName: true, lastName: true, phone: true,
+      id: true, sourceSequence: true, firstName: true, lastName: true, nationalId: true, phone: true,
       email: true, birthDate: true, tshirtSize: true, licenseNo: true, notes: true,
       isActiveFlying: true,
       createdAt: true, updatedAt: true,
@@ -42,7 +31,9 @@ export async function getPersonnelList(): Promise<Personnel[]> {
     sourceSequence: row.sourceSequence,
     firstName: row.firstName,
     lastName: row.lastName,
-    phone: maskPhone(row.phone),
+    // TODO(public-release): Mask national ID and phone before this system is exposed publicly.
+    nationalId: row.nationalId,
+    phone: row.phone,
     email: row.email,
     birthDate: row.birthDate?.toISOString().slice(0, 10) ?? null,
     tshirtSize: row.tshirtSize,

@@ -2,10 +2,13 @@ import { SummaryCards } from "@/src/components/dashboard/summary-cards";
 import { PersonnelTable } from "@/src/components/dashboard/personnel-table";
 import { getPersonnelList } from "@/src/lib/personnel";
 import { ThemeToggle } from "@/src/components/theme-toggle";
+import { UserMenu } from "@/src/components/auth/user-menu";
+import { requirePermission } from "@/src/lib/authz";
 import { connection } from "next/server";
 
 export default async function HomePage() {
   await connection();
+  await requirePermission("VIEW_DASHBOARD");
   const personnel = await getPersonnelList();
 
   return (
@@ -21,10 +24,7 @@ export default async function HomePage() {
               </p>
             </div>
             <div className="flex items-start gap-3">
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-800/70 dark:text-slate-400">
-                <p className="font-semibold text-slate-900 dark:text-slate-100">MVP görünüm</p>
-                <p>Geliştirmeye hazır, üretime yakın operasyon arayüzü</p>
-              </div>
+              <UserMenu />
               <ThemeToggle />
             </div>
           </div>
@@ -36,7 +36,8 @@ export default async function HomePage() {
           <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Personel Listesi</h2>
-              <p className="text-sm text-slate-500 dark:text-slate-400">Özel veriler gizlenmiş, yönetim paneli odaklı görünüm</p>
+              {/* TODO(public-release): Restore masking for sensitive personnel fields before public release. */}
+              <p className="text-sm text-slate-500 dark:text-slate-400">Yetkili kullanıcılar için dahili operasyon görünümü</p>
             </div>
             <div className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-sm font-medium text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
               {personnel.length} kayıt
