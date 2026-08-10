@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 
-const publicPaths = ["/login", "/api/auth"];
+const publicPaths = ["/login", "/api/auth", "/api/internal/naeron-sync"];
 
 export default auth((request) => {
   const { pathname, search } = request.nextUrl;

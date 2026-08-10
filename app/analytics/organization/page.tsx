@@ -16,7 +16,7 @@ function OrganizationTable({ title, data }: { title: string; data: Map<string, O
 export default async function OrganizationPage({ searchParams }: OrganizationPageProps) {
   await connection(); await requirePermission("VIEW_DASHBOARD");
   const query = await searchParams; const { from, to } = analyticsRange(query);
-  const flights = await prisma.flight.findMany({ where: { flightDate: { gte: from, lte: to }, archivedAt: null, status: "COMPLETED", instructorId: { not: null } }, select: { sortieDurationMinutes: true, instructorId: true, studentId: true, instructor: { select: { team: { select: { name: true } }, company: { select: { name: true } } } } } });
+  const flights = await prisma.flight.findMany({ where: { flightDate: { gte: from, lte: to }, archivedAt: null, archived: false, status: "COMPLETED", instructorId: { not: null } }, select: { sortieDurationMinutes: true, instructorId: true, studentId: true, instructor: { select: { team: { select: { name: true } }, company: { select: { name: true } } } } } });
   const aggregate = (kind: "team" | "company") => {
     const map = new Map<string, OrganizationValue>();
     for (const flight of flights) {

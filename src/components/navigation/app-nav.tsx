@@ -18,6 +18,7 @@ export async function AppNav() {
         <Link key={href} href={href} className="rounded-lg px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-950 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white">{label}</Link>
       ))}
       {user.role === "ADMIN" ? <Link href="/admin/users" className="rounded-lg px-3 py-2 text-sm font-medium text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-500/10">Admin</Link> : null}
+      {user.role !== "VIEWER" ? <Link href="/admin/sync" className="rounded-lg px-3 py-2 text-sm font-medium text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-500/10">Naeron Sync</Link> : null}
     </nav>
   );
 }

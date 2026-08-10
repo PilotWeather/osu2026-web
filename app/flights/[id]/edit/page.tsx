@@ -24,13 +24,13 @@ export default async function FlightEditPage({ params, searchParams }: FlightEdi
   const archive = archiveFlight.bind(null, id);
   const inputClass = "mt-1 block w-full rounded-xl border border-slate-300 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-800";
   const fields = [
-    ["Sorti No", "sourceSortieNo", flight.sourceSortieNo ?? ""], ["Uçak", "aircraft", flight.aircraft.registration],
+    ["Sorti No", "sourceSortieNo", flight.sourceSortieNo ?? ""], ["Uçak", "aircraft", flight.aircraft?.registration ?? ""],
     ["Öğrenci", "studentName", flight.student?.displayName ?? flight.studentName ?? ""], ["Kalkış meydanı", "departureAirport", flight.departureAirport ?? ""],
     ["Varış meydanı", "arrivalAirport", flight.arrivalAirport ?? ""], ["Kalkış", "takeoffTime", formatOperationalTime(flight.takeoffTime)],
     ["İniş", "landingTime", formatOperationalTime(flight.landingTime)],
   ];
   return <main className="min-h-screen bg-slate-50 px-4 py-6 dark:bg-[#0b0f19] sm:px-6 lg:px-8"><div className="mx-auto max-w-4xl space-y-6">
-    <AppHeader title="Uçuş Düzeltme" subtitle={`${flight.flightDate.toISOString().slice(0, 10)} · ${flight.aircraft.registration}`} />
+    <AppHeader title="Uçuş Düzeltme" subtitle={`${flight.flightDate.toISOString().slice(0, 10)} · ${flight.aircraft?.registration ?? "Uçak eşleşmedi"}`} />
     {query.message ? <div className="rounded-xl bg-red-50 p-3 text-red-700 dark:bg-red-500/10 dark:text-red-300">{query.message}</div> : null}
     <form action={update} className="grid gap-4 rounded-[28px] border border-slate-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-900 sm:grid-cols-2">
       {fields.map(([label, name, value]) => <label key={name} className="text-sm font-medium">{label}<input name={name} defaultValue={value} className={inputClass} /></label>)}

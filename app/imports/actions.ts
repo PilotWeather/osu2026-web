@@ -34,26 +34,34 @@ export async function uploadFlightPdf(formData: FormData): Promise<void> {
   });
   if (duplicate) messageRedirect("/imports", "error", "Bu dosya daha önce içe aktarılmış.");
 
-  const personnel = await prisma.personnel.findMany({ select: { id: true, firstName: true, lastName: true } });
+  const personnel = await prisma.personnel.findMany({ select: { id: true, firstName: true, lastName: true, aliases: { select: { alias: true, normalizedAlias: true } } } });
   let parsed;
   try {
-    parsed = await parseCompletedFlightsPdf(data, personnel.map((person) => `${person.firstName} ${person.lastName}`));
+    parsed = await parseCompletedFlightsPdf(data, personnel.flatMap((person) => [`${person.firstName} ${person.lastName}`, ...person.aliases.map((alias) => alias.alias)]));
   } catch {
     messageRedirect("/imports", "error", "PDF metni okunamadı. Dosyanın metin tabanlı olduğundan emin olun.");
   }
   if (!parsed.rows.length) {
     messageRedirect("/imports", "error", parsed.warnings[0] ?? "PDF içinde uçuş satırı bulunamadı.");
   }
-  const personnelByName = new Map<string, string[]>();
+  const personnelByName = new Map<string, Set<string>>();
+  const addPersonnelName = (name: string, personnelId: string) => {
+    const ids = personnelByName.get(name) ?? new Set<string>();
+    ids.add(personnelId);
+    personnelByName.set(name, ids);
+  };
   for (const person of personnel) {
     const key = normalizePersonName(`${person.firstName} ${person.lastName}`);
-    personnelByName.set(key, [...(personnelByName.get(key) ?? []), person.id]);
+    addPersonnelName(key, person.id);
+    for (const alias of person.aliases) {
+      addPersonnelName(alias.normalizedAlias, person.id);
+    }
   }
 
   const prepared = parsed.rows.map((row) => {
     if (row.flightStatus === "CANCELLED") return { row, normalized: "", instructorId: null, warning: null, status: ImportRowStatus.CANCELLED };
     const normalized = normalizedParsedInstructor(row);
-    const matches = normalized ? personnelByName.get(normalized) ?? [] : [];
+    const matches = normalized ? [...(personnelByName.get(normalized) ?? [])] : [];
     const instructorId = matches.length === 1 ? matches[0] : null;
     const warning = !row.valid
       ? row.warnings.join(" ") || "Geçersiz satır."
@@ -161,6 +169,7 @@ export async function confirmFlightImport(batchId: string, formData: FormData): 
       await tx.flight.create({
         data: {
           signature,
+          externalId: `pdf:${signature}`,
           status: raw.flightStatus === "CANCELLED" ? FlightStatus.CANCELLED : FlightStatus.COMPLETED,
           flightDate: new Date(`${raw.flightDate}T00:00:00.000Z`),
           sourceFlightCode: raw.sourceFlightCode,

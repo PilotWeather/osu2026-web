@@ -9,18 +9,22 @@ import type { Personnel } from "@/src/types/personnel";
 
 interface PersonnelTableProps {
   personnel: Personnel[];
+  companies: string[];
+  teams: string[];
+  canEdit: boolean;
 }
 
 function getCredential(person: Personnel, type: "SEP" | "SEP_FI" | "CLASS_1") {
   return person.credentials.find((credential) => credential.type === type)?.expiryDate ?? null;
 }
 
-export function PersonnelTable({ personnel }: PersonnelTableProps) {
+export function PersonnelTable({ personnel, companies, teams, canEdit }: PersonnelTableProps) {
   const [search, setSearch] = useState("");
   const [team, setTeam] = useState("Tüm");
   const [company, setCompany] = useState("Tümü");
   const [status, setStatus] = useState("All");
-  const [selectedPerson, setSelectedPerson] = useState<Personnel | null>(null);
+  const [selectedPersonId, setSelectedPersonId] = useState<string | null>(null);
+  const selectedPerson = personnel.find((person) => person.id === selectedPersonId) ?? null;
 
   const filteredPersonnel = useMemo(() => {
     const term = search.toLocaleLowerCase("tr-TR");
@@ -79,11 +83,11 @@ export function PersonnelTable({ personnel }: PersonnelTableProps) {
                   role="button"
                   tabIndex={0}
                   className="cursor-pointer odd:bg-white even:bg-slate-50/40 hover:bg-blue-50/60 focus-visible:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-600 dark:odd:bg-slate-900 dark:even:bg-slate-800/25 dark:hover:bg-blue-400/10 dark:focus-visible:bg-blue-400/10 dark:focus-visible:ring-blue-400"
-                  onClick={() => setSelectedPerson(person)}
+                  onClick={() => setSelectedPersonId(person.id)}
                   onKeyDown={(event) => {
                     if (event.key === "Enter" || event.key === " ") {
                       event.preventDefault();
-                      setSelectedPerson(person);
+                      setSelectedPersonId(person.id);
                     }
                   }}
                 >
@@ -110,7 +114,7 @@ export function PersonnelTable({ personnel }: PersonnelTableProps) {
         </div>
       </div>
 
-      {selectedPerson ? <PersonnelDetail person={selectedPerson} onClose={() => setSelectedPerson(null)} /> : null}
+      {selectedPerson ? <PersonnelDetail key={selectedPerson.id} person={selectedPerson} companies={companies} teams={teams} canEdit={canEdit} onClose={() => setSelectedPersonId(null)} /> : null}
     </div>
   );
 }

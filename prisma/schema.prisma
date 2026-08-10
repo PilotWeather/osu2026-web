@@ -24,10 +24,10 @@ model Team {
 }
 
 model Personnel {
-  id                String       @id @default(cuid())
-  sourceKey         String       @unique
+  id                String           @id @default(cuid())
+  sourceKey         String           @unique
   sourceSequence    Int?
-  nationalId        String?      @unique
+  nationalId        String?          @unique
   firstName         String
   lastName          String
   phone             String?
@@ -36,22 +36,39 @@ model Personnel {
   tshirtSize        String?
   licenseNo         String?
   notes             String?
-  isActiveFlying    Boolean      @default(false)
+  isActiveFlying    Boolean          @default(false)
+  naeronEmployeeId  String?          @unique
+  naeronVmId        String?
   companyId         String?
   teamId            String?
-  createdAt         DateTime     @default(now())
-  updatedAt         DateTime     @updatedAt
-  company           Company?     @relation(fields: [companyId], references: [id])
-  team              Team?        @relation(fields: [teamId], references: [id])
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+  company           Company?         @relation(fields: [companyId], references: [id])
+  team              Team?            @relation(fields: [teamId], references: [id])
   vehicles          Vehicle[]
   credentials       Credential[]
-  instructedFlights Flight[]     @relation("FlightInstructor")
+  instructedFlights Flight[]         @relation("FlightInstructor")
+  observedFlights   Flight[]         @relation("FlightObserver")
   importRows        ImportRow[]
+  aliases           PersonnelAlias[]
 
   @@index([companyId])
   @@index([teamId])
   @@index([licenseNo])
   @@index([isActiveFlying])
+  @@index([naeronVmId])
+}
+
+model PersonnelAlias {
+  id              String    @id @default(cuid())
+  personnelId     String
+  alias           String
+  normalizedAlias String
+  createdAt       DateTime  @default(now())
+  personnel       Personnel @relation(fields: [personnelId], references: [id], onDelete: Cascade)
+
+  @@unique([personnelId, normalizedAlias])
+  @@index([normalizedAlias])
 }
 
 model Vehicle {
@@ -100,24 +117,40 @@ model AuthorizedUser {
 }
 
 model Aircraft {
-  id           String   @id @default(cuid())
-  registration String   @unique
-  aircraftType String?
-  active       Boolean  @default(true)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  flights      Flight[]
+  id                String    @id @default(cuid())
+  registration      String    @unique
+  aircraftType      String?
+  naeronAircraftId  String?   @unique
+  naeronVmId        String?
+  currentTach       Decimal?  @db.Decimal(12, 2)
+  lastFlightDate    DateTime?
+  lastBase          String?
+  underMaintenance  Boolean   @default(false)
+  ueggs             DateTime?
+  naeronPayload     Json?
+  upstreamUpdatedAt DateTime?
+  active            Boolean   @default(true)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  flights           Flight[]
 
   @@index([active])
+  @@index([naeronVmId])
+  @@index([underMaintenance])
 }
 
 model Student {
-  id             String   @id @default(cuid())
-  normalizedName String   @unique
-  displayName    String
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-  flights        Flight[]
+  id               String   @id @default(cuid())
+  normalizedName   String   @unique
+  displayName      String
+  naeronPersonId   String?  @unique
+  naeronVmId       String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  flights          Flight[] @relation("PrimaryStudent")
+  secondaryFlights Flight[] @relation("SecondStudent")
+
+  @@index([naeronVmId])
 }
 
 model ImportBatch {
@@ -170,20 +203,27 @@ model ImportRow {
 
 model Flight {
   id                      String       @id @default(cuid())
+  externalId              String       @unique
+  externalPlanId          String?
   signature               String       @unique
   status                  FlightStatus @default(COMPLETED)
   flightDate              DateTime
+  landingDate             DateTime?
   sourceFlightCode        String?
   sourceTeam              String?
   trainingTask            String?
   sourceSortieNo          String?
   sourceFlightType        String?
-  aircraftId              String
+  aircraftId              String?
   instructorId            String?
   studentId               String?
+  secondStudentId         String?
+  observerPersonnelId     String?
   studentName             String?
   departureAirport        String?
   arrivalAirport          String?
+  offBlockTime            DateTime?
+  onBlockTime             DateTime?
   takeoffTime             DateTime?
   landingTime             DateTime?
   airborneDurationMinutes Int?
@@ -192,15 +232,31 @@ model Flight {
   flightRules             String?
   runway                  String?
   frequency               String?
+  route                   String?
   remarks                 String?
-  importBatchId           String
+  cancellationReason      String?
+  endingTach              Decimal?     @db.Decimal(12, 2)
+  landingCount            Int?
+  hasFault                Boolean?
+  faultDescription        String?
+  faultState              String?
+  upstreamUpdatedAt       DateTime?
+  upstreamStatus          String?
+  upstreamRealized        Int?
+  upstreamCanceled        Int?
+  upstreamIncomplete      Int?
+  naeronPayload           Json?
+  archived                Boolean      @default(false)
+  importBatchId           String?
   archivedAt              DateTime?
   createdAt               DateTime     @default(now())
   updatedAt               DateTime     @updatedAt
-  aircraft                Aircraft     @relation(fields: [aircraftId], references: [id])
+  aircraft                Aircraft?    @relation(fields: [aircraftId], references: [id])
   instructor              Personnel?   @relation("FlightInstructor", fields: [instructorId], references: [id], onDelete: SetNull)
-  student                 Student?     @relation(fields: [studentId], references: [id], onDelete: SetNull)
-  importBatch             ImportBatch  @relation(fields: [importBatchId], references: [id])
+  observerPersonnel       Personnel?   @relation("FlightObserver", fields: [observerPersonnelId], references: [id], onDelete: SetNull)
+  student                 Student?     @relation("PrimaryStudent", fields: [studentId], references: [id], onDelete: SetNull)
+  secondStudent           Student?     @relation("SecondStudent", fields: [secondStudentId], references: [id], onDelete: SetNull)
+  importBatch             ImportBatch? @relation(fields: [importBatchId], references: [id])
 
   @@index([flightDate])
   @@index([status, flightDate])
@@ -208,10 +264,55 @@ model Flight {
   @@index([aircraftId])
   @@index([instructorId])
   @@index([studentId])
+  @@index([secondStudentId])
+  @@index([observerPersonnelId])
   @@index([importBatchId])
   @@index([takeoffTime])
   @@index([landingTime])
   @@index([archivedAt])
+  @@index([upstreamUpdatedAt])
+  @@index([archived])
+}
+
+model NaeronSyncState {
+  id                   String    @id @default(cuid())
+  tableName            String    @unique
+  snapshotCursor       String?
+  changesCursor        String?
+  deletedCursor        String?
+  lastSuccessfulSyncAt DateTime?
+  lastFullSyncAt       DateTime?
+  lastError            String?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+}
+
+model NaeronSyncBatch {
+  id                   String         @id @default(cuid())
+  tableName            String
+  mode                 NaeronSyncMode
+  startedAt            DateTime       @default(now())
+  completedAt          DateTime?
+  fetched              Int            @default(0)
+  created              Int            @default(0)
+  updated              Int            @default(0)
+  archived             Int            @default(0)
+  completedFlights     Int            @default(0)
+  cancelledFlights     Int            @default(0)
+  unmatchedInstructors Int            @default(0)
+  unmatchedStudents    Int            @default(0)
+  aircraftUpdated      Int            @default(0)
+  errors               Int            @default(0)
+  success              Boolean        @default(false)
+  errorMessage         String?
+
+  @@index([tableName, startedAt])
+  @@index([success, startedAt])
+}
+
+enum NaeronSyncMode {
+  FULL
+  INCREMENTAL
 }
 
 enum ImportStatus {
@@ -234,6 +335,8 @@ enum ImportRowStatus {
 enum FlightStatus {
   COMPLETED
   CANCELLED
+  INCOMPLETE
+  UNKNOWN
 }
 
 model User {
