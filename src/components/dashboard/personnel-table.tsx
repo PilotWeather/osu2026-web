@@ -5,6 +5,7 @@ import { ExpiryBadge } from "@/src/components/dashboard/expiry-badge";
 import { Filters } from "@/src/components/dashboard/filters";
 import { PersonnelDetail } from "@/src/components/dashboard/personnel-detail";
 import { FlyingStatusBadge } from "@/src/components/dashboard/flying-status-badge";
+import { personnelDisplayName } from "@/src/lib/personnel-display";
 import type { Personnel } from "@/src/types/personnel";
 
 interface PersonnelTableProps {
@@ -94,7 +95,7 @@ export function PersonnelTable({ personnel, companies, teams, canEdit }: Personn
                   <td className="px-4 py-3">
                     <div className="flex flex-wrap items-center gap-2 font-semibold text-slate-900 dark:text-slate-100">
                       <span aria-hidden="true" className={person.isActiveFlying ? "size-2 rounded-full bg-green-500 dark:bg-green-400" : "size-2 rounded-full bg-slate-400"} />
-                      <span>{person.firstName} {person.lastName}</span>
+                      <span>{personnelDisplayName(person)}</span>
                       <FlyingStatusBadge isActive={person.isActiveFlying} />
                     </div>
                     <div className="text-xs text-slate-500 dark:text-slate-400">{person.email ?? "E-posta yok"}</div>

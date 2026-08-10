@@ -5,6 +5,7 @@ import { AppHeader } from "@/src/components/navigation/app-header";
 import { requirePermission } from "@/src/lib/authz";
 import { prisma } from "@/src/lib/db";
 import { formatOperationalTime } from "@/src/lib/flights/time";
+import { personnelDisplayName } from "@/src/lib/personnel-display";
 
 interface FlightEditPageProps {
   params: Promise<{ id: string }>;
@@ -17,7 +18,7 @@ export default async function FlightEditPage({ params, searchParams }: FlightEdi
   const [{ id }, query] = await Promise.all([params, searchParams]);
   const [flight, personnel] = await Promise.all([
     prisma.flight.findUnique({ where: { id }, include: { aircraft: true, student: true } }),
-    prisma.personnel.findMany({ orderBy: { firstName: "asc" }, select: { id: true, firstName: true, lastName: true } }),
+    prisma.personnel.findMany({ orderBy: { firstName: "asc" }, select: { id: true, firstName: true, lastName: true, canonicalFullName: true } }),
   ]);
   if (!flight) notFound();
   const update = updateFlight.bind(null, id);
@@ -34,7 +35,7 @@ export default async function FlightEditPage({ params, searchParams }: FlightEdi
     {query.message ? <div className="rounded-xl bg-red-50 p-3 text-red-700 dark:bg-red-500/10 dark:text-red-300">{query.message}</div> : null}
     <form action={update} className="grid gap-4 rounded-[28px] border border-slate-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-900 sm:grid-cols-2">
       {fields.map(([label, name, value]) => <label key={name} className="text-sm font-medium">{label}<input name={name} defaultValue={value} className={inputClass} /></label>)}
-      <label className="text-sm font-medium">Öğretmen<select name="instructorId" defaultValue={flight.instructorId ?? ""} className={inputClass}><option value="">-</option>{personnel.map((person) => <option key={person.id} value={person.id}>{person.firstName} {person.lastName}</option>)}</select></label>
+      <label className="text-sm font-medium">Öğretmen<select name="instructorId" defaultValue={flight.instructorId ?? ""} className={inputClass}><option value="">-</option>{personnel.map((person) => <option key={person.id} value={person.id}>{personnelDisplayName(person)}</option>)}</select></label>
       {[["Sorti dakika", "sortieDurationMinutes", flight.sortieDurationMinutes], ["Havada dakika", "airborneDurationMinutes", flight.airborneDurationMinutes], ["Yer dakika", "groundDurationMinutes", flight.groundDurationMinutes]].map(([label, name, value]) => <label key={name as string} className="text-sm font-medium">{label}<input type="number" min="0" name={name as string} defaultValue={value ?? ""} className={inputClass} /></label>)}
       <label className="text-sm font-medium sm:col-span-2">Açıklama<textarea name="remarks" defaultValue={flight.remarks ?? ""} className={inputClass} /></label>
       <div className="flex justify-end sm:col-span-2"><button className="rounded-xl bg-blue-600 px-5 py-2.5 font-semibold text-white">Kaydet</button></div>

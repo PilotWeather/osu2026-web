@@ -16,7 +16,7 @@ export async function getPersonnelList(): Promise<Personnel[]> {
   const rows = await prisma.personnel.findMany({
     orderBy: [{ sourceSequence: "asc" }, { lastName: "asc" }],
     select: {
-      id: true, sourceSequence: true, firstName: true, lastName: true, nationalId: true, phone: true,
+      id: true, sourceSequence: true, firstName: true, lastName: true, canonicalFullName: true, nationalId: true, phone: true,
       email: true, birthDate: true, tshirtSize: true, licenseNo: true, notes: true,
       isActiveFlying: true,
       createdAt: true, updatedAt: true,
@@ -31,6 +31,7 @@ export async function getPersonnelList(): Promise<Personnel[]> {
     sourceSequence: row.sourceSequence,
     firstName: row.firstName,
     lastName: row.lastName,
+    canonicalFullName: row.canonicalFullName,
     // TODO(public-release): Mask national ID and phone before this system is exposed publicly.
     nationalId: row.nationalId,
     phone: row.phone,

@@ -1,14 +1,21 @@
 if (typeof window !== "undefined") throw new Error("Naeron synchronization is server-only.");
 
 import { FlightStatus, NaeronSyncMode, Prisma } from "@prisma/client";
+import { randomUUID } from "node:crypto";
 import { prisma } from "@/src/lib/db";
 import { normalizeAircraftRegistration, normalizePersonName } from "@/src/lib/flights/normalize";
 import { getNaeronChanges, getNaeronDeleted, getNaeronSnapshot, type NaeronAircraftRow, type NaeronFlightRow, type NaeronPage } from "@/src/lib/naeron/client";
 import { naeronMinutesFromMidnight, parseNaeronDate } from "@/src/lib/naeron/time";
+import { autoReconcileNaeronPersonnel, linkNaeronInstructor } from "@/src/lib/naeron/personnel-reconciliation";
 
 const FLIGHTS_TABLE = "bi_flights";
 const AIRCRAFT_TABLE = "bi_aircrafts_simulators";
 const PAGE_SIZE = 250;
+const LOCK_TIMEOUT_MS = 15 * 60 * 1_000;
+
+export class NaeronSyncInProgressError extends Error {
+  constructor() { super("Senkronizasyon zaten çalışıyor."); this.name = "NaeronSyncInProgressError"; }
+}
 
 export interface NaeronSyncResult {
   batchId: string; fetched: number; created: number; updated: number; archived: number;
@@ -17,7 +24,7 @@ export interface NaeronSyncResult {
 }
 
 interface MatchContext {
-  personnelByEmployee: Map<string, string>; personnelByVm: Map<string, string>; personnelByName: Map<string, Set<string>>;
+  personnelByEmployee: Map<string, Set<string>>; personnelByVm: Map<string, Set<string>>; personnelByName: Map<string, Set<string>>; personnelByAlias: Map<string, Set<string>>; reconciledPersonnel: Set<string>;
   studentsByPerson: Map<string, string>; studentsByVm: Map<string, string>; studentsByName: Map<string, string>;
   aircraftByExternal: Map<string, string>; aircraftByVm: Map<string, string>; aircraftByRegistration: Map<string, string>;
   aircraftUpdatedById: Map<string, Date>;
@@ -27,18 +34,34 @@ function addName(map: Map<string, Set<string>>, name: string, id: string) {
   const ids = map.get(name) ?? new Set<string>(); ids.add(id); map.set(name, ids);
 }
 
+async function acquireSyncLock(triggeredByEmail?: string) {
+  await prisma.naeronSyncState.upsert({ where: { tableName: FLIGHTS_TABLE }, update: {}, create: { tableName: FLIGHTS_TABLE } });
+  const token = randomUUID(); const staleBefore = new Date(Date.now() - LOCK_TIMEOUT_MS);
+  const locked = await prisma.naeronSyncState.updateMany({
+    where: { tableName: FLIGHTS_TABLE, OR: [{ syncLockToken: null }, { syncLockedAt: { lt: staleBefore } }] },
+    data: { syncLockToken: token, syncLockedAt: new Date(), syncLockedByEmail: triggeredByEmail ?? null },
+  });
+  if (locked.count !== 1) throw new NaeronSyncInProgressError();
+  return token;
+}
+
+async function releaseSyncLock(token: string) {
+  await prisma.naeronSyncState.updateMany({ where: { tableName: FLIGHTS_TABLE, syncLockToken: token }, data: { syncLockToken: null, syncLockedAt: null, syncLockedByEmail: null } });
+}
+
 async function createContext(): Promise<MatchContext> {
   const [personnel, students, aircraft] = await Promise.all([
-    prisma.personnel.findMany({ select: { id: true, firstName: true, lastName: true, naeronEmployeeId: true, naeronVmId: true, aliases: { select: { normalizedAlias: true } } } }),
+    prisma.personnel.findMany({ select: { id: true, firstName: true, lastName: true, canonicalFullName: true, naeronEmployeeId: true, naeronVmId: true, aliases: { select: { normalizedAlias: true } } } }),
     prisma.student.findMany({ select: { id: true, normalizedName: true, naeronPersonId: true, naeronVmId: true } }),
     prisma.aircraft.findMany({ select: { id: true, registration: true, naeronAircraftId: true, naeronVmId: true, upstreamUpdatedAt: true } }),
   ]);
-  const context: MatchContext = { personnelByEmployee: new Map(), personnelByVm: new Map(), personnelByName: new Map(), studentsByPerson: new Map(), studentsByVm: new Map(), studentsByName: new Map(), aircraftByExternal: new Map(), aircraftByVm: new Map(), aircraftByRegistration: new Map(), aircraftUpdatedById: new Map() };
+  const context: MatchContext = { personnelByEmployee: new Map(), personnelByVm: new Map(), personnelByName: new Map(), personnelByAlias: new Map(), reconciledPersonnel: new Set(), studentsByPerson: new Map(), studentsByVm: new Map(), studentsByName: new Map(), aircraftByExternal: new Map(), aircraftByVm: new Map(), aircraftByRegistration: new Map(), aircraftUpdatedById: new Map() };
   for (const person of personnel) {
-    if (person.naeronEmployeeId) context.personnelByEmployee.set(person.naeronEmployeeId, person.id);
-    if (person.naeronVmId) context.personnelByVm.set(person.naeronVmId, person.id);
+    if (person.naeronEmployeeId) addName(context.personnelByEmployee, person.naeronEmployeeId, person.id);
+    if (person.naeronVmId) addName(context.personnelByVm, person.naeronVmId, person.id);
     addName(context.personnelByName, normalizePersonName(`${person.firstName} ${person.lastName}`), person.id);
-    for (const alias of person.aliases) addName(context.personnelByName, alias.normalizedAlias, person.id);
+    if (person.canonicalFullName) addName(context.personnelByName, normalizePersonName(person.canonicalFullName), person.id);
+    for (const alias of person.aliases) addName(context.personnelByAlias, alias.normalizedAlias, person.id);
   }
   for (const student of students) { if (student.naeronPersonId) context.studentsByPerson.set(student.naeronPersonId, student.id); if (student.naeronVmId) context.studentsByVm.set(student.naeronVmId, student.id); context.studentsByName.set(student.normalizedName, student.id); }
   for (const item of aircraft) { if (item.naeronAircraftId) context.aircraftByExternal.set(item.naeronAircraftId, item.id); if (item.naeronVmId) context.aircraftByVm.set(item.naeronVmId, item.id); context.aircraftByRegistration.set(item.registration, item.id); if (item.upstreamUpdatedAt) context.aircraftUpdatedById.set(item.id, item.upstreamUpdatedAt); }
@@ -47,18 +70,27 @@ async function createContext(): Promise<MatchContext> {
 
 async function matchPersonnel(context: MatchContext, externalId: number | null, vmId: string | null, name: string | null): Promise<string | null> {
   const external = externalId === null ? null : String(externalId);
-  let id = external ? context.personnelByEmployee.get(external) : undefined;
-  id ??= vmId ? context.personnelByVm.get(vmId) : undefined;
-  if (!id && name) { const ids = context.personnelByName.get(normalizePersonName(name)); if (ids?.size === 1) id = [...ids][0]; }
+  const unique = (ids: Set<string> | undefined) => ids?.size === 1 ? [...ids][0] : undefined;
+  const employeeId = external ? unique(context.personnelByEmployee.get(external)) : undefined;
+  const personnelVmId = vmId ? unique(context.personnelByVm.get(vmId)) : undefined;
+  if (employeeId && personnelVmId && employeeId !== personnelVmId) return null;
+  let id = employeeId ?? personnelVmId;
+  const normalizedName = normalizePersonName(name);
+  id ??= normalizedName ? unique(context.personnelByName.get(normalizedName)) : undefined;
+  id ??= normalizedName ? unique(context.personnelByAlias.get(normalizedName)) : undefined;
   if (!id) return null;
-  const data: { naeronEmployeeId?: string; naeronVmId?: string } = {};
-  if (external && !context.personnelByEmployee.has(external)) data.naeronEmployeeId = external;
-  if (vmId && !context.personnelByVm.has(vmId)) data.naeronVmId = vmId;
-  if (Object.keys(data).length) {
-    await prisma.personnel.update({ where: { id }, data });
-    if (data.naeronEmployeeId) context.personnelByEmployee.set(data.naeronEmployeeId, id);
-    if (data.naeronVmId) context.personnelByVm.set(data.naeronVmId, id);
+  const reconciliationKey = `${external ?? ""}:${vmId ?? ""}:${normalizedName}`;
+  if (name && !context.reconciledPersonnel.has(reconciliationKey)) {
+    try {
+      await linkNaeronInstructor({ key: reconciliationKey, employeeId: external, vmId, name: name.trim() }, id);
+      context.reconciledPersonnel.add(reconciliationKey);
+    } catch {
+      return null;
+    }
   }
+  if (external) addName(context.personnelByEmployee, external, id);
+  if (vmId) addName(context.personnelByVm, vmId, id);
+  if (normalizedName) addName(context.personnelByName, normalizedName, id);
   return id;
 }
 
@@ -182,10 +214,10 @@ async function completeBatch(batchId: string, result: Omit<NaeronSyncResult, "ba
   return { batchId, ...result, durationMs: Date.now() - started };
 }
 
-export async function runNaeronFullSync(options: { startDate?: string; endDate?: string } = {}): Promise<NaeronSyncResult> {
+export async function runNaeronFullSync(options: { startDate?: string; endDate?: string; triggeredByEmail?: string } = {}): Promise<NaeronSyncResult> {
   if (Boolean(options.startDate) !== Boolean(options.endDate)) throw new Error("Both startDate and endDate are required for a restricted sync.");
-  const restricted = Boolean(options.startDate); const started = Date.now();
-  const batch = await prisma.naeronSyncBatch.create({ data: { tableName: FLIGHTS_TABLE, mode: NaeronSyncMode.FULL } });
+  const restricted = Boolean(options.startDate); const started = Date.now(); const lockToken = await acquireSyncLock(options.triggeredByEmail);
+  const batch = await prisma.naeronSyncBatch.create({ data: { tableName: FLIGHTS_TABLE, mode: NaeronSyncMode.FULL, triggeredByEmail: options.triggeredByEmail } }).catch(async (error) => { await releaseSyncLock(lockToken); throw error; });
   const totals = { fetched: 0, created: 0, updated: 0, archived: 0, completedFlights: 0, cancelledFlights: 0, unmatchedInstructors: 0, unmatchedStudents: 0, aircraftUpdated: 0 };
   try {
     const context = await createContext(); totals.aircraftUpdated = await syncAircraftInventory(context);
@@ -208,13 +240,14 @@ export async function runNaeronFullSync(options: { startDate?: string; endDate?:
       const incremental = await drainIncremental(context); totals.fetched += incremental.fetched; totals.created += incremental.created; totals.updated += incremental.updated; totals.archived += incremental.archived; totals.completedFlights += incremental.completedFlights; totals.cancelledFlights += incremental.cancelledFlights; totals.unmatchedInstructors += incremental.unmatchedInstructors; totals.unmatchedStudents += incremental.unmatchedStudents;
       await prisma.naeronSyncState.update({ where: { tableName: FLIGHTS_TABLE }, data: { lastFullSyncAt: new Date(), lastSuccessfulSyncAt: new Date(), lastError: null } });
     }
+    const reconciliation = await autoReconcileNaeronPersonnel(); totals.unmatchedInstructors = reconciliation.unmatched + reconciliation.reviewRequired;
     return await completeBatch(batch.id, totals, started);
   } catch (error) {
     const message = error instanceof Error ? error.message.slice(0, 1000) : "Unknown Naeron sync error";
     await prisma.naeronSyncBatch.update({ where: { id: batch.id }, data: { completedAt: new Date(), success: false, errors: 1, errorMessage: message } });
     if (!restricted) await prisma.naeronSyncState.upsert({ where: { tableName: FLIGHTS_TABLE }, update: { lastError: message }, create: { tableName: FLIGHTS_TABLE, lastError: message } });
     throw error;
-  }
+  } finally { await releaseSyncLock(lockToken); }
 }
 
 async function drainIncremental(context: MatchContext) {
@@ -224,7 +257,7 @@ async function drainIncremental(context: MatchContext) {
   do {
     const page = await getNaeronChanges<NaeronFlightRow>(FLIGHTS_TABLE, { cursor: changesCursor, limit: PAGE_SIZE });
     const result = await processFlightPage(page.data, context); totals.fetched += page.data.length; totals.created += result.created; totals.updated += result.updated; totals.completedFlights += result.completed; totals.cancelledFlights += result.cancelled; totals.unmatchedInstructors += result.unmatchedInstructors; totals.unmatchedStudents += result.unmatchedStudents;
-    changesCursor = page.meta.cursor ?? changesCursor; await prisma.naeronSyncState.update({ where: { tableName: FLIGHTS_TABLE }, data: { changesCursor } });
+    changesCursor = page.meta.cursor ?? changesCursor;
     if (!page.meta.hasMore) break;
   } while (changesCursor);
   let deletedCursor = state.deletedCursor;
@@ -232,23 +265,26 @@ async function drainIncremental(context: MatchContext) {
     const page = await getNaeronDeleted(FLIGHTS_TABLE, { cursor: deletedCursor, limit: PAGE_SIZE });
     const ids = page.deletedRecords.map((record) => String(record.recordID));
     if (ids.length) { const result = await prisma.flight.updateMany({ where: { externalId: { in: ids }, archived: false }, data: { archived: true } }); totals.archived += result.count; }
-    deletedCursor = page.meta.cursor ?? deletedCursor; await prisma.naeronSyncState.update({ where: { tableName: FLIGHTS_TABLE }, data: { deletedCursor } });
+    deletedCursor = page.meta.cursor ?? deletedCursor;
     if (!page.meta.hasMore) break;
   } while (deletedCursor);
+  await prisma.naeronSyncState.update({ where: { tableName: FLIGHTS_TABLE }, data: { changesCursor, deletedCursor } });
   return totals;
 }
 
-export async function runNaeronIncrementalSync(): Promise<NaeronSyncResult> {
+export async function runNaeronIncrementalSync(options: { triggeredByEmail?: string } = {}): Promise<NaeronSyncResult> {
   const started = Date.now(); const state = await prisma.naeronSyncState.findUnique({ where: { tableName: FLIGHTS_TABLE } });
   if (!state?.lastFullSyncAt) throw new Error("Complete the initial Naeron full sync before incremental synchronization.");
-  const batch = await prisma.naeronSyncBatch.create({ data: { tableName: FLIGHTS_TABLE, mode: NaeronSyncMode.INCREMENTAL } });
+  const lockToken = await acquireSyncLock(options.triggeredByEmail);
+  const batch = await prisma.naeronSyncBatch.create({ data: { tableName: FLIGHTS_TABLE, mode: NaeronSyncMode.INCREMENTAL, triggeredByEmail: options.triggeredByEmail } }).catch(async (error) => { await releaseSyncLock(lockToken); throw error; });
   try {
     const context = await createContext(); const aircraftUpdated = await syncAircraftInventory(context); const result = await drainIncremental(context);
+    const reconciliation = await autoReconcileNaeronPersonnel(); result.unmatchedInstructors = reconciliation.unmatched + reconciliation.reviewRequired;
     await prisma.naeronSyncState.update({ where: { tableName: FLIGHTS_TABLE }, data: { lastSuccessfulSyncAt: new Date(), lastError: null } });
     return await completeBatch(batch.id, { ...result, aircraftUpdated }, started);
   } catch (error) {
     const message = error instanceof Error ? error.message.slice(0, 1000) : "Unknown Naeron sync error";
     await prisma.naeronSyncBatch.update({ where: { id: batch.id }, data: { completedAt: new Date(), success: false, errors: 1, errorMessage: message } });
     await prisma.naeronSyncState.update({ where: { tableName: FLIGHTS_TABLE }, data: { lastError: message } }); throw error;
-  }
+  } finally { await releaseSyncLock(lockToken); }
 }

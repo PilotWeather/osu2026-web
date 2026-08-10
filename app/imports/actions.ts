@@ -34,10 +34,10 @@ export async function uploadFlightPdf(formData: FormData): Promise<void> {
   });
   if (duplicate) messageRedirect("/imports", "error", "Bu dosya daha önce içe aktarılmış.");
 
-  const personnel = await prisma.personnel.findMany({ select: { id: true, firstName: true, lastName: true, aliases: { select: { alias: true, normalizedAlias: true } } } });
+  const personnel = await prisma.personnel.findMany({ select: { id: true, firstName: true, lastName: true, canonicalFullName: true, aliases: { select: { alias: true, normalizedAlias: true } } } });
   let parsed;
   try {
-    parsed = await parseCompletedFlightsPdf(data, personnel.flatMap((person) => [`${person.firstName} ${person.lastName}`, ...person.aliases.map((alias) => alias.alias)]));
+    parsed = await parseCompletedFlightsPdf(data, personnel.flatMap((person) => [person.canonicalFullName, `${person.firstName} ${person.lastName}`, ...person.aliases.map((alias) => alias.alias)].filter((name): name is string => Boolean(name))));
   } catch {
     messageRedirect("/imports", "error", "PDF metni okunamadı. Dosyanın metin tabanlı olduğundan emin olun.");
   }
@@ -53,6 +53,7 @@ export async function uploadFlightPdf(formData: FormData): Promise<void> {
   for (const person of personnel) {
     const key = normalizePersonName(`${person.firstName} ${person.lastName}`);
     addPersonnelName(key, person.id);
+    if (person.canonicalFullName) addPersonnelName(normalizePersonName(person.canonicalFullName), person.id);
     for (const alias of person.aliases) {
       addPersonnelName(alias.normalizedAlias, person.id);
     }

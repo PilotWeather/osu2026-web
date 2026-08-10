@@ -1,6 +1,7 @@
 import "server-only";
 
 import { prisma } from "@/src/lib/db";
+import { personnelDisplayName } from "@/src/lib/personnel-display";
 
 export const GRADUATION_TASKS = ["INT-10", "INT-11", "INT-12", "INT-13", "INT-14"] as const;
 export type GraduationTask = (typeof GRADUATION_TASKS)[number];
@@ -137,7 +138,7 @@ export async function getGraduationRadar(): Promise<GraduationRadarData> {
       select: {
         id: true, flightDate: true, trainingTask: true,
         student: { select: { id: true, displayName: true, naeronPersonId: true, naeronVmId: true } },
-        instructor: { select: { firstName: true, lastName: true, team: { select: { name: true } } } },
+        instructor: { select: { firstName: true, lastName: true, canonicalFullName: true, team: { select: { name: true } } } },
         aircraft: { select: { registration: true } },
       },
     }),
@@ -153,7 +154,7 @@ export async function getGraduationRadar(): Promise<GraduationRadarData> {
     const group = grouped.get(row.student.id) ?? { student: row.student, flights: [] };
     group.flights.push({
       id: row.id, task, date: dateKey(row.flightDate),
-      instructor: row.instructor ? `${row.instructor.firstName} ${row.instructor.lastName}` : null,
+      instructor: row.instructor ? personnelDisplayName(row.instructor) : null,
       aircraft: row.aircraft?.registration ?? null,
       team: teamFromLatestInstructor(row.instructor?.team?.name),
     });

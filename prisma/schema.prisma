@@ -30,6 +30,7 @@ model Personnel {
   nationalId        String?          @unique
   firstName         String
   lastName          String
+  canonicalFullName String?
   phone             String?
   email             String?
   birthDate         DateTime?
@@ -57,6 +58,7 @@ model Personnel {
   @@index([licenseNo])
   @@index([isActiveFlying])
   @@index([naeronVmId])
+  @@index([canonicalFullName])
 }
 
 model PersonnelAlias {
@@ -283,8 +285,13 @@ model NaeronSyncState {
   lastSuccessfulSyncAt DateTime?
   lastFullSyncAt       DateTime?
   lastError            String?
+  syncLockToken        String?
+  syncLockedAt         DateTime?
+  syncLockedByEmail    String?
   createdAt            DateTime  @default(now())
   updatedAt            DateTime  @updatedAt
+
+  @@index([syncLockedAt])
 }
 
 model NaeronSyncBatch {
@@ -305,9 +312,11 @@ model NaeronSyncBatch {
   errors               Int            @default(0)
   success              Boolean        @default(false)
   errorMessage         String?
+  triggeredByEmail     String?
 
   @@index([tableName, startedAt])
   @@index([success, startedAt])
+  @@index([triggeredByEmail, startedAt])
 }
 
 enum NaeronSyncMode {

@@ -4,6 +4,7 @@ import { useActionState, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { initialPersonnelUpdateState, updatePersonnel } from "@/app/personnel/actions";
 import { FlyingStatusBadge } from "@/src/components/dashboard/flying-status-badge";
+import { personnelDisplayName } from "@/src/lib/personnel-display";
 import { formatDate } from "@/src/lib/expiry";
 import type { Personnel, PersonnelCredentialType } from "@/src/types/personnel";
 
@@ -50,7 +51,7 @@ export function PersonnelDetail({ person, companies, teams, canEdit, onClose }: 
   }, [editing, onClose]);
 
   const detailRows = [
-    ["Ad Soyad", `${person.firstName} ${person.lastName}`], ["Şirket", person.company ?? "-"], ["Ekip", person.team ?? "-"],
+    ["Ad Soyad", personnelDisplayName(person)], ["Şirket", person.company ?? "-"], ["Ekip", person.team ?? "-"],
     ["E-posta", person.email ?? "-"], ["Telefon", person.phone ?? "-"], ["T.C. Kimlik No", person.nationalId ?? "-"],
     ["Doğum tarihi", formatDate(person.birthDate)], ["T-shirt bedeni", person.tshirtSize ?? "-"], ["Araç plakası", person.vehiclePlate ?? "-"],
     ["Lisans numarası", person.licenseNo ?? "-"], ["Kaynak sıra", person.sourceSequence?.toString() ?? "-"],
@@ -60,7 +61,7 @@ export function PersonnelDetail({ person, companies, teams, canEdit, onClose }: 
   return <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/45 p-4 backdrop-blur-sm dark:bg-black/65 sm:items-center" onMouseDown={(event) => { if (event.target === event.currentTarget && !editing) onClose(); }}>
     <div role="dialog" aria-modal="true" aria-labelledby="personnel-detail-title" className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl dark:border-slate-700 dark:bg-slate-900 dark:shadow-black/50">
       {toast ? <div role="status" className="mb-4 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm font-medium text-green-700 dark:border-green-500/30 dark:bg-green-500/10 dark:text-green-300">{toast}</div> : null}
-      <div className="flex items-start justify-between gap-4"><div><p className="text-sm font-semibold uppercase tracking-[0.2em] text-blue-600 dark:text-blue-400">Personel Detayı</p><h2 id="personnel-detail-title" className="mt-1 text-2xl font-semibold text-slate-900 dark:text-slate-100">{person.firstName} {person.lastName}</h2><div className="mt-3"><FlyingStatusBadge isActive={person.isActiveFlying} detailed /></div></div>
+      <div className="flex items-start justify-between gap-4"><div><p className="text-sm font-semibold uppercase tracking-[0.2em] text-blue-600 dark:text-blue-400">Personel Detayı</p><h2 id="personnel-detail-title" className="mt-1 text-2xl font-semibold text-slate-900 dark:text-slate-100">{personnelDisplayName(person)}</h2><div className="mt-3"><FlyingStatusBadge isActive={person.isActiveFlying} detailed /></div></div>
         <div className="flex gap-2">{canEdit && !editing ? <button type="button" onClick={() => setEditing(true)} className="rounded-xl bg-blue-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500">Düzenle</button> : null}<button type="button" onClick={onClose} className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">Kapat</button></div></div>
 
       {editing ? <form action={formAction} className="mt-6 space-y-5">
