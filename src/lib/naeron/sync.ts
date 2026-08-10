@@ -72,8 +72,7 @@ async function matchStudent(context: MatchContext, externalId: number | null, vm
     const student = await prisma.student.create({ data: { normalizedName, displayName: displayName?.trim() || normalizedName, naeronPersonId: external, naeronVmId: vmId } });
     id = student.id; context.studentsByName.set(normalizedName, id);
   } else if (id) {
-    const data: { displayName?: string; naeronPersonId?: string; naeronVmId?: string } = {};
-    if (displayName) data.displayName = displayName.trim();
+    const data: { naeronPersonId?: string; naeronVmId?: string } = {};
     if (external && !context.studentsByPerson.has(external)) data.naeronPersonId = external;
     if (vmId && !context.studentsByVm.has(vmId)) data.naeronVmId = vmId;
     if (Object.keys(data).length) await prisma.student.update({ where: { id }, data });
@@ -88,6 +87,7 @@ async function matchAircraft(context: MatchContext, row: Pick<NaeronFlightRow, "
   const registration = normalizeAircraftRegistration(row.aircraftName_);
   let id = external ? context.aircraftByExternal.get(external) : undefined;
   id ??= vmId ? context.aircraftByVm.get(vmId) : undefined;
+  if (id) return id;
   id ??= registration ? context.aircraftByRegistration.get(registration) : undefined;
   if (!id && registration) {
     const item = await prisma.aircraft.create({ data: { registration, naeronAircraftId: external, naeronVmId: vmId } }); id = item.id;
@@ -117,6 +117,8 @@ function decimal(value: string | null): Prisma.Decimal | null {
 async function processFlightPage(rows: NaeronFlightRow[], context: MatchContext) {
   const existing = new Map((await prisma.flight.findMany({ where: { externalId: { in: rows.map((row) => String(row.m_ID)) } }, select: { externalId: true, upstreamUpdatedAt: true } })).map((flight) => [flight.externalId, flight]));
   const result = { created: 0, updated: 0, completed: 0, cancelled: 0, unmatchedInstructors: 0, unmatchedStudents: 0, aircraftUpdated: 0 };
+  const creates: Prisma.FlightCreateManyInput[] = [];
+  const updates: Array<{ externalId: string; data: Prisma.FlightUncheckedUpdateInput }> = [];
   for (const row of rows) {
     const externalId = String(row.m_ID); const incomingUpdatedAt = parseNaeronDate(row._lastRowUpdate) ?? new Date(0);
     const current = existing.get(externalId);
@@ -144,9 +146,11 @@ async function processFlightPage(rows: NaeronFlightRow[], context: MatchContext)
       upstreamStatus: row._flightStatus, upstreamRealized: row.realized, upstreamCanceled: row.canceled, upstreamIncomplete: row.incomplete,
       naeronPayload: row as Prisma.InputJsonValue, archived: row._lastRowStatus === "destroy",
     };
-    if (current) { await prisma.flight.update({ where: { externalId }, data }); result.updated += 1; }
-    else { await prisma.flight.create({ data: { externalId, signature: `naeron:${externalId}`, ...data } }); result.created += 1; }
+    if (current) updates.push({ externalId, data });
+    else creates.push({ externalId, signature: `naeron:${externalId}`, ...data });
   }
+  if (creates.length) result.created = (await prisma.flight.createMany({ data: creates, skipDuplicates: true })).count;
+  if (updates.length) { await prisma.$transaction(updates.map((item) => prisma.flight.update({ where: { externalId: item.externalId }, data: item.data }))); result.updated = updates.length; }
   return result;
 }
 
@@ -220,7 +224,7 @@ async function drainIncremental(context: MatchContext) {
   do {
     const page = await getNaeronChanges<NaeronFlightRow>(FLIGHTS_TABLE, { cursor: changesCursor, limit: PAGE_SIZE });
     const result = await processFlightPage(page.data, context); totals.fetched += page.data.length; totals.created += result.created; totals.updated += result.updated; totals.completedFlights += result.completed; totals.cancelledFlights += result.cancelled; totals.unmatchedInstructors += result.unmatchedInstructors; totals.unmatchedStudents += result.unmatchedStudents;
-    changesCursor = page.meta.cursor; await prisma.naeronSyncState.update({ where: { tableName: FLIGHTS_TABLE }, data: { changesCursor } });
+    changesCursor = page.meta.cursor ?? changesCursor; await prisma.naeronSyncState.update({ where: { tableName: FLIGHTS_TABLE }, data: { changesCursor } });
     if (!page.meta.hasMore) break;
   } while (changesCursor);
   let deletedCursor = state.deletedCursor;
@@ -228,7 +232,7 @@ async function drainIncremental(context: MatchContext) {
     const page = await getNaeronDeleted(FLIGHTS_TABLE, { cursor: deletedCursor, limit: PAGE_SIZE });
     const ids = page.deletedRecords.map((record) => String(record.recordID));
     if (ids.length) { const result = await prisma.flight.updateMany({ where: { externalId: { in: ids }, archived: false }, data: { archived: true } }); totals.archived += result.count; }
-    deletedCursor = page.meta.cursor; await prisma.naeronSyncState.update({ where: { tableName: FLIGHTS_TABLE }, data: { deletedCursor } });
+    deletedCursor = page.meta.cursor ?? deletedCursor; await prisma.naeronSyncState.update({ where: { tableName: FLIGHTS_TABLE }, data: { deletedCursor } });
     if (!page.meta.hasMore) break;
   } while (deletedCursor);
   return totals;
