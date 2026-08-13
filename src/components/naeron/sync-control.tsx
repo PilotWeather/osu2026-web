@@ -3,7 +3,9 @@
 import Link from "next/link";
 import { useActionState } from "react";
 import { useFormStatus } from "react-dom";
-import { initialDashboardSyncState, syncNaeronFromDashboard } from "@/app/dashboard/actions";
+import { syncNaeronFromDashboard, type DashboardSyncState } from "@/app/dashboard/actions";
+
+const initialDashboardSyncState: DashboardSyncState = { status: "idle", message: "" };
 
 function SyncButton({ disabled }: { disabled: boolean }) {
   const { pending } = useFormStatus();

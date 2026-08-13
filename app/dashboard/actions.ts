@@ -8,10 +8,8 @@ import { NaeronSyncInProgressError, runNaeronIncrementalSync } from "@/src/lib/n
 export interface DashboardSyncState {
   status: "idle" | "success" | "error" | "running";
   message: string;
-  result?: { fetched: number; created: number; updated: number; archived: number; flights: number; aircraft: number; cancelled: number; unmatchedInstructors: number };
+  result?: { success: true; table: "bi_flights"; fetched: number; created: number; updated: number; archived: number; flights: number; aircraft: number; cancelled: number; unmatchedInstructors: number; errors: number; durationMs: number; lastSuccessfulSyncAt: string };
 }
-
-export const initialDashboardSyncState: DashboardSyncState = { status: "idle", message: "" };
 
 export async function syncNaeronFromDashboard(_previousState: DashboardSyncState): Promise<DashboardSyncState> {
   void _previousState;
@@ -20,9 +18,10 @@ export async function syncNaeronFromDashboard(_previousState: DashboardSyncState
   try {
     const result = await runNaeronIncrementalSync({ triggeredByEmail: user.email });
     revalidatePath("/dashboard"); revalidatePath("/flights"); revalidatePath("/analytics"); revalidatePath("/admin/sync");
-    return { status: "success", message: "Naeron güncellendi", result: { fetched: result.fetched, created: result.created, updated: result.updated, archived: result.archived, flights: result.completedFlights, aircraft: result.aircraftUpdated, cancelled: result.cancelledFlights, unmatchedInstructors: result.unmatchedInstructors } };
+    return { status: "success", message: "Naeron güncellendi", result: { success: true, table: "bi_flights", fetched: result.fetched, created: result.created, updated: result.updated, archived: result.archived, flights: result.completedFlights, aircraft: result.aircraftUpdated, cancelled: result.cancelledFlights, unmatchedInstructors: result.unmatchedInstructors, errors: result.errors, durationMs: result.durationMs, lastSuccessfulSyncAt: new Date().toISOString() } };
   } catch (error) {
     if (error instanceof NaeronSyncInProgressError) return { status: "running", message: "Senkronizasyon zaten çalışıyor." };
-    return { status: "error", message: "Naeron senkronizasyonu başarısız. Mevcut veriler gösterilmeye devam ediyor." };
+    const reason = error instanceof Error && /authentication|timed out|database|cursor/i.test(error.message) ? error.message : "Beklenmeyen sunucu hatası.";
+    return { status: "error", message: `Naeron senkronizasyonu başarısız. ${reason} Mevcut veriler gösterilmeye devam ediyor.` };
   }
 }
